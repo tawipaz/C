@@ -31,7 +31,7 @@ const UserApproval = ({ user }) => {
   const fetchPendingUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${CONFIG.OFFICERS_API}?action=get_pending_users`);
+      const response = await fetch(`${CONFIG.OFFICERS_API}/pending`);
       const data = await response.json();
       if (data.success) {
         // ป้องกันการแสดงผลผิดพลาดโดยการกรองข้อมูลที่ status เป็น pending เท่านั้น
@@ -53,16 +53,15 @@ const UserApproval = ({ user }) => {
 
   const handleUserStatus = async (userId, newStatus) => {
     try {
-      const response = await fetch(CONFIG.OFFICERS_API, {
-        method: 'POST',
+      const response = await fetch(`${CONFIG.OFFICERS_API}/${userId}/status`, {
+        method: 'PATCH', // หรือ 'PUT' ขึ้นอยู่กับการออกแบบ API
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'update_user_status',
-          user_id: userId,
           status: newStatus,
           admin_user_id: user.id
         }),
       });
+
       const data = await response.json();
       if (data.success) {
         fetchPendingUsers();
@@ -116,7 +115,8 @@ const UserApproval = ({ user }) => {
 
 // --- Component: Personnel Management Section ---
 const PersonnelManagement = ({ user }) => {
-  const [officers, setOfficers] = useState([]);
+  const [allOfficers, setAllOfficers] = useState([]); // Holds all users from API
+  const [officers, setOfficers] = useState([]); // Holds filtered users for display
   const [loading, setLoading] = useState(true);
   const [editingOfficer, setEditingOfficer] = useState(null);
   const [filters, setFilters] = useState({
@@ -126,48 +126,90 @@ const PersonnelManagement = ({ user }) => {
     department: ''
   });
 
-  const fetchOfficers = useCallback(async () => {
+  const fetchAllOfficers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ action: 'get_all_officers', ...filters });
-      const response = await fetch(`${CONFIG.OFFICERS_API}?${params.toString()}`);
+      const response = await fetch(CONFIG.OFFICERS_API);
       const data = await response.json();
       
+      let officersData = [];
       if (Array.isArray(data)) {
-        setOfficers(data);
+        officersData = data;
       } else if (data && data.success && Array.isArray(data.data)) {
-        setOfficers(data.data);
+        officersData = data.data;
       } else {
         console.error('Invalid data format:', data);
-        setOfficers([]);
       }
+      setAllOfficers(officersData);
     } catch (error) {
       console.error("Error fetching officers:", error);
-      setOfficers([]);
+      setAllOfficers([]); // เคลียร์ข้อมูลทั้งหมดเมื่อเกิดข้อผิดพลาด
+      setOfficers([]); // เคลียร์ข้อมูลที่แสดงผลเมื่อเกิดข้อผิดพลาด
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []); // แก้ไข: ลบ [filters] ออก เพื่อให้ฟังก์ชันนี้ถูกสร้างขึ้นครั้งเดียวและไม่ re-fetch ข้อมูลเมื่อ filter เปลี่ยน
 
   useEffect(() => {
-    fetchOfficers();
-  }, [fetchOfficers]);
+    fetchAllOfficers();
+  }, [fetchAllOfficers]);
 
+  // Apply filters whenever the master list or filter values change
+  useEffect(() => {
+    let filtered = allOfficers;
+
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(officer =>
+        `${officer.prefix || ''} ${officer.firstname || ''} ${officer.lastname || ''}`.toLowerCase().includes(searchTerm) ||
+        (officer.phone && officer.phone.includes(searchTerm))
+      );
+    }
+
+    if (filters.role) {
+      filtered = filtered.filter(officer => officer.role === filters.role);
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter(officer => officer.status === filters.status);
+    }
+
+    if (filters.department) {
+      const departmentTerm = filters.department.toLowerCase();
+      filtered = filtered.filter(officer => 
+        (officer.department && officer.department.toLowerCase().includes(departmentTerm)) ||
+        (officer.affiliation && officer.affiliation.toLowerCase().includes(departmentTerm))
+      );
+    }
+
+    setOfficers(filtered);
+  }, [filters, allOfficers]);
   const handleUpdateOfficer = async (officerId, updates) => {
     try {
-      const response = await fetch(CONFIG.OFFICERS_API, {
-        method: 'POST',
+      const response = await fetch(`${CONFIG.OFFICERS_API}/${officerId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'update_officer',
-          officer_id: officerId,
           updates: updates,
           admin_user_id: user.id
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server responded with ${response.status}: ${errorText.substring(0, 500)}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        console.error("Received non-JSON response:", responseText);
+        throw new Error(`Expected JSON response, but received ${contentType}. See console for details.`);
+      }
+
       const data = await response.json();
       if (data.success) {
-        fetchOfficers();
+        fetchAllOfficers();
         setEditingOfficer(null);
         alert('อัปเดตข้อมูลสำเร็จ');
       } else {
@@ -181,7 +223,23 @@ const PersonnelManagement = ({ user }) => {
 
   const handleDeleteOfficer = async (officer) => {
     if (!window.confirm(`คุณแน่ใจหรือไม่ที่จะลบ ${officer.firstname} ${officer.lastname}?`)) return;
-    await handleUpdateOfficer(officer.id || officer.phone, { status: 'deleted' });
+    try {
+      const response = await fetch(`${CONFIG.OFFICERS_API}/${officer.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_user_id: user.id }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchAllOfficers();
+        alert('ลบข้อมูลสำเร็จ');
+      } else {
+        throw new Error(data.message || 'ไม่สามารถลบข้อมูลได้');
+      }
+    } catch (error) {
+      console.error("Error deleting officer:", error);
+      alert(`เกิดข้อผิดพลาดในการลบข้อมูล: ${error.message}`);
+    }
   };
 
   const getRoleIcon = (role) => {
@@ -215,9 +273,9 @@ const PersonnelManagement = ({ user }) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-slate-800">จัดการบัญชีผู้ใช้ ({officers.length})</h2>
+        <h2 className="text-xl font-semibold text-slate-800">จัดการบุคลากร ({officers.length})</h2>
         <button 
-          onClick={fetchOfficers}
+          onClick={fetchAllOfficers}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <RefreshCw className="w-4 h-4" />
@@ -376,15 +434,23 @@ const PersonnelManagement = ({ user }) => {
 
 // --- Component: Edit Officer Form ---
 const EditOfficerForm = ({ officer, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({
-    prefix: officer.prefix || '',
-    firstname: officer.firstname || '',
-    lastname: officer.lastname || '',
-    position: officer.position || '',
-    department: officer.department || officer.affiliation || '',
-    role: officer.role || 'member',
-    status: officer.status || 'active'
-  });
+    const [formData, setFormData] = useState({
+        prefix: officer.prefix || '',
+        firstname: officer.firstname || '',
+        lastname: officer.lastname || '',
+        position: officer.position || '',
+        department: officer.department || officer.affiliation || '',
+        role: officer.role || 'member',
+        status: officer.status || 'active'
+    });
+
+    const availableRoles = ['member', 'scheduler', 'supervisor', 'admin'];
+    const availableStatuses = ['active', 'pending', 'inactive', 'rejected', 'deleted'];
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -393,137 +459,55 @@ const EditOfficerForm = ({ officer, onSave, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* input field ต่างๆ */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700">ชื่อ</label>
-        <input
-          type="text"
-          value={formData.firstname}
-          onChange={(e) => setFormData({...formData, firstname: e.target.value})}
-          className="w-full p-2 border border-slate-300 rounded-lg"
-        />
-      </div>
-
-      <div className="flex justify-end space-x-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg">ยกเลิก</button>
-        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg">บันทึก</button>
-      </div>
-    </form>
-  );
-};
-
-// --- Component: Role Management Section ---
-const RoleManagement = ({ user }) => {
-  const [officers, setOfficers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const availableRoles = ['member', 'scheduler', 'supervisor', 'admin'];
-
-  const fetchOfficers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/officers.php?action=get_all_officers`);
-      const data = await response.json();
-      if (data.success) {
-        setOfficers(data.data
-          .filter(o => o.role !== 'super_admin')
-          .sort((a, b) => a.firstname.localeCompare(b.firstname, 'th'))
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching officers:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchOfficers();
-  }, [fetchOfficers]);
-
-  const handleRoleChange = async (officerId, newRole) => {
-    if (officerId === user.id) {
-        alert("ไม่สามารถเปลี่ยน Role ของตนเองได้");
-        fetchOfficers();
-        return;
-    }
-
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/officers.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_officer',
-          officer_id: officerId,
-          updates: { role: newRole },
-          admin_user_id: user.id
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setOfficers(prevOfficers =>
-          prevOfficers.map(o => (o.id === officerId ? { ...o, role: newRole } : o))
-        );
-      } else {
-        alert(`Error: ${data.message}`);
-        fetchOfficers();
-      }
-    } catch (error) {
-      console.error("Error updating role:", error);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-800">จัดการสิทธิ์ผู้ใช้</h2>
-        <button onClick={() => { setRefreshing(true); fetchOfficers(); }} disabled={refreshing} className="p-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-50">
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="p-3">ชื่อ-นามสกุล</th>
-                <th className="p-3">ตำแหน่ง</th>
-                <th className="p-3">Role ปัจจุบัน</th>
-                <th className="p-3 w-1/4">เปลี่ยน Role เป็น</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="4" className="text-center p-4">กำลังโหลด...</td></tr>
-              ) : officers.map(officer => (
-                <tr key={officer.id} className="border-t border-slate-200">
-                  <td className="p-3 font-medium text-slate-800">{officer.prefix} {officer.firstname} {officer.lastname}</td>
-                  <td className="p-3 text-slate-500">{officer.position || '-'}</td>
-                  <td className="p-3">
-                    <span className="font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded-md text-xs">{officer.role || 'member'}</span>
-                  </td>
-                  <td className="p-3">
-                    <select
-                      value={officer.role || 'member'}
-                      onChange={(e) => handleRoleChange(officer.id, e.target.value)}
-                      disabled={officer.id === user.id}
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                    >
-                      {availableRoles.map(role => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-1">
+          <label className="block text-sm font-medium text-slate-700">คำนำหน้า</label>
+          <input name="prefix" type="text" value={formData.prefix} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg" />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700">ชื่อ</label>
+          <input name="firstname" type="text" value={formData.firstname} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg" required />
         </div>
       </div>
-    </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">นามสกุล</label>
+        <input name="lastname" type="text" value={formData.lastname} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">ตำแหน่ง</label>
+        <input name="position" type="text" value={formData.position} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">สังกัด/หน่วยงาน</label>
+        <input name="department" type="text" value={formData.department} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700">สิทธิ์ (Role)</label>
+          <select name="role" value={formData.role} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            {availableRoles.map(role => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700">สถานะ</label>
+          <select name="status" value={formData.status} onChange={handleChange} className="mt-1 w-full p-2 border border-slate-300 rounded-lg">
+            {availableStatuses.map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200">
+        <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">ยกเลิก</button>
+        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center space-x-2">
+          <Save className="w-4 h-4" />
+          <span>บันทึก</span>
+        </button>
+      </div>
+    </form>
   );
 };
 
@@ -537,12 +521,11 @@ const ActivityLogs = () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        action: 'get_logs',
         search: filters.search,
-        start_date: filters.startDate,
-        end_date: filters.endDate,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
       });
-      const response = await fetch(`${CONFIG.OFFICERS_API}?${params.toString()}`);
+      const response = await fetch(`${CONFIG.LOGS_API}?${params.toString()}`);
       const result = await response.json();
 
       if (result.success) {
@@ -576,7 +559,7 @@ const ActivityLogs = () => {
     const blob = new Blob(['\\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `activity_logs_${new Date().toLocaleDateString('th-TH').replace(/\\//g, '-')}.csv`;
+    link.download = `activity_logs_${new Date().toLocaleDateString('th-TH').replace(/\//g, '-')}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   }, [logs]);
@@ -632,8 +615,7 @@ const ActivityLogs = () => {
 export default function AdminPage({ user }) {
     const allTabs = [
       { key: 'approval', label: 'คำขออนุมัติ', icon: UserCheck, component: <UserApproval user={user} />, roles: ['super_admin', 'admin'] },
-      { key: 'personnel', label: 'จัดการบัญชี', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },
-      { key: 'roles', label: 'จัดการสิทธิ์', icon: KeyRound, component: <RoleManagement user={user}/>, roles: ['super_admin', 'admin']},
+      { key: 'personnel', label: 'จัดการบุคลากร', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'logs', label: 'บันทึกกิจกรรม', icon: History, component: <ActivityLogs />, roles: ['super_admin', 'admin', 'supervisor'] },
     ];
 

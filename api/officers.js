@@ -88,6 +88,58 @@ router.put('/:id/status', async (req, res) => {
     }
 });
 
+// PUT /api/officers/:id (Update general officer details)
+router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const { updates } = req.body;
+
+    if (!updates || Object.keys(updates).length === 0) {
+        return res.status(400).json({ success: false, message: "ไม่มีข้อมูลสำหรับอัปเดต" });
+    }
+
+    // Whitelist of columns that can be updated to prevent SQL injection or unwanted updates
+    const allowedUpdates = [
+        'prefix', 'firstname', 'lastname', 'dob', 'position', 'affiliation', 
+        'department', 'generation', 'appointment_method', 'education', 
+        'work_history', 'position_number', 'notes', 'age', 'role', 'status', 'username'
+    ];
+
+    const queryParts = [];
+    const values = [];
+    let valueCount = 1;
+
+    for (const key in updates) {
+        if (allowedUpdates.includes(key)) {
+            // Use quotes for column names that might be reserved keywords like "position"
+            queryParts.push(`\"${key}\" = $${valueCount++}`);
+            values.push(updates[key]);
+        }
+    }
+
+    if (queryParts.length === 0) {
+        return res.status(400).json({ success: false, message: "ไม่มีฟิลด์ที่ถูกต้องสำหรับการอัปเดต" });
+    }
+
+    values.push(id);
+    const query = `
+        UPDATE officers 
+        SET ${queryParts.join(', ')}, updated_at = NOW() 
+        WHERE id = $${valueCount} 
+        RETURNING ${OFFICER_COLUMNS_TO_RETURN}
+    `;
+
+    try {
+        const result = await pool.query(query, values);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "ไม่พบข้อมูลเจ้าหน้าที่" });
+        }
+        res.json({ success: true, message: "อัปเดตข้อมูลสำเร็จ", data: result.rows[0] });
+    } catch (err) {
+        console.error(`Error updating officer ${id}:`, err);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+});
+
 // DELETE /api/officers/:id (Soft delete a user)
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;

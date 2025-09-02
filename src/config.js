@@ -11,14 +11,12 @@ export const CONFIG = {
   // API Base URL
   API_BASE_URL: API_BASE_URL,
   
-  // REST API Endpoints (โครงสร้างใหม่)
-  AUTH_API: `${API_BASE_URL}/api/auth`,
-  OFFICERS_API: `${API_BASE_URL}/api/officers`,  // ไม่ใช่ officers.php แล้ว
-  UNITS_API: `${API_BASE_URL}/api/units`,        // ไม่ใช่ units.php แล้ว  
-  SCHEDULES_API: `${API_BASE_URL}/api/schedules`, // ไม่ใช่ schedules.php แล้ว
-  ADMIN_API: `${API_BASE_URL}/api/admin`,
-
+  OFFICERS_API: `${API_BASE_URL}/api/officers`,
+  UNITS_API: `${API_BASE_URL}/api/units`,
+  SCHEDULES_API: `${API_BASE_URL}/api/schedules`,
+  LOGS_API: `${API_BASE_URL}/api/logs`,
   // Redirect URI
+  
   REDIRECT_URI: isDevelopment
     ? (process.env.REACT_APP_LINE_REDIRECT_URI_DEV || "http://localhost:3000")
     : (process.env.REACT_APP_LINE_REDIRECT_URI_PROD || "https://courtmarshal.rf.gd"),

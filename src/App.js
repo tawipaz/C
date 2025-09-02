@@ -1,45 +1,59 @@
-import React, { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import AuthRegisterPage from "./pages/AuthRegisterPage";
-import DashboardPage from "./pages/DashboardPage";
-import PersonnelPage from "./pages/PersonnelPage";
-import ShiftWorkPage from "./pages/ShiftWorkPage";
-import AppLayout from "./layouts/AppLayout";
-import ChatPage from "./pages/ChatPage";
-import AdminPage from "./pages/AdminPage";
-import OnDutyPage from "./pages/OnDutyPage";
-import MockLoginPage from "./pages/MockLoginPage";
-import ProtectedRoute from "./routes/ProtectedRoute";
-import ProfilePage from "./pages/ProfilePage";
-import SettingsPage from "./pages/SettingsPage";
-import DutyManagementPage from "./pages/DutyManagementPage"; // เพิ่ม import นี้
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import AdminPage from './pages/AdminPage';
+import LoginPage from './pages/LoginPage';
+import OnDutyPage from './pages/OnDutyPage';
+import AuthRegisterPage from './pages/AuthRegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import PersonnelPage from './pages/PersonnelPage';
+import ShiftWorkPage from './pages/ShiftWorkPage';
+import AppLayout from './layouts/AppLayout';
+import ChatPage from './pages/ChatPage';
+import ProtectedRoute from './routes/ProtectedRoute';
+import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
+import DutyManagementPage from "./pages/DutyManagementPage";
+import { CONFIG } from './config';
 
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const saved = localStorage.getItem("authUser");
-    if (saved) {
-      try {
-        const parsedUser = JSON.parse(saved);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error("App.js: Error parsing saved user:", error);
-        localStorage.removeItem("authUser");
+    const checkLoginStatus = async () => {
+      const token = localStorage.getItem('user_token');
+      if (token) {
+        try {
+          const response = await fetch(`${CONFIG.API_BASE_URL}/api/auth/verify`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          if (data.success) {
+            setUser(data.user);
+          } else {
+            localStorage.removeItem('user_token');
+          }
+        } catch (error) {
+          console.error("Token verification failed:", error);
+          localStorage.removeItem('user_token');
+        }
       }
-    }
-    setAuthLoading(false);
+      setAuthLoading(false);
+    };
+    checkLoginStatus();
   }, []);
 
-  const handleLoginSuccess = (u) => {
-    setUser(u);
-    localStorage.setItem("authUser", JSON.stringify(u));
+  const handleLogin = (loginData) => {
+    localStorage.setItem('user_token', loginData.token);
+    setUser(loginData.user);
+    navigate("/");
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('user_token');
     setUser(null);
-    localStorage.removeItem("authUser");
+    navigate("/login");
   };
 
   const handleOpenNotifications = () => {
@@ -47,37 +61,43 @@ function App() {
   };
 
   return (
-    <Routes>
-      {/* Public Routes: ทุกคนสามารถเข้าถึงได้ */}
-      <Route path="/on-duty" element={<OnDutyPage />} />
+    <div className="bg-slate-100 min-h-screen">
+      <div className="container mx-auto p-4">
+        {authLoading ? (
+          <div className="flex items-center justify-center min-h-screen"><div>กำลังโหลด...</div></div>
+        ) : (
+          <Routes>
+            <Route path="/on-duty" element={<OnDutyPage />} />
+            <Route 
+              path="/login" 
+              element={!user ? <LoginPage onLogin={handleLogin} /> : <Navigate to="/" />} 
+            />
+            <Route 
+              path="/register" 
+              element={!user ? <AuthRegisterPage onLoginSuccess={handleLogin} /> : <Navigate to="/" />} 
+            />
+            
+            <Route element={<ProtectedRoute user={user} />}>
+              <Route element={<AppLayout user={user} onLogout={handleLogout} onOpenNotifications={handleOpenNotifications} />}>
+                <Route path="/" element={<DashboardPage user={user} />} />
+                <Route path="/personnel" element={<PersonnelPage user={user} />} />
+                <Route path="/tasks" element={<ShiftWorkPage user={user} />} />
+                <Route path="/shifts" element={<ShiftWorkPage user={user} />} />
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/profile" element={<ProfilePage user={user} />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/duty-management" element={<DutyManagementPage />} />
+                {user?.role === 'admin' && (
+                  <Route path="/admin" element={<AdminPage user={user} />} />
+                )}
+              </Route>
+            </Route>
 
-      {/* Authentication Routes: สำหรับผู้ที่ยังไม่ล็อกอิน */}
-      <Route path="/auth" element={!user ? <AuthRegisterPage onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" />} />
-      <Route path="/mock-login" element={!user ? <MockLoginPage onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" />} />
-
-      {/* Protected routes - wrapped by AppLayout */}
-      {/* เส้นทางที่ต้องล็อกอินก่อน: ทั้งหมดจะถูกคุมโดย "ยาม" (ProtectedRoute) */}
-      <Route element={<ProtectedRoute user={user} authLoading={authLoading} />}>
-        {/* เมื่อผ่าน "ยาม" มาได้ จะแสดง AppLayout เสมอ */}
-        <Route element={<AppLayout user={user} onLogout={handleLogout} onOpenNotifications={handleOpenNotifications} />}>
-          {/* เนื้อหาข้างใน AppLayout จะเปลี่ยนไปตาม URL */}
-          <Route path="/" element={<DashboardPage user={user} />} />
-          <Route path="/personnel" element={<PersonnelPage user={user} />} />
-          <Route path="/tasks" element={<ShiftWorkPage user={user} />} />
-          <Route path="/shifts" element={<ShiftWorkPage user={user} />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/profile" element={<ProfilePage user={user} />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/duty-management" element={<DutyManagementPage />} />
-          {user?.role === 'admin' && (
-            <Route path="/admin" element={<AdminPage user={user} />} />
-          )}
-        </Route>
-      </Route>
-
-      {/* ถ้าไม่เข้าเงื่อนไขไหนเลย และยังไม่ได้ล็อกอิน ให้ไปหน้าล็อกอิน */}
-      <Route path="*" element={<Navigate to="/mock-login" />} />
-    </Routes>
+            <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
+          </Routes>
+        )}
+      </div>
+    </div>
   );
 }
 
