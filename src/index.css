@@ -1,54 +1,20 @@
-/* src/index.css */
+/* ============= Font Loading ============= */
+@import url('https://fonts.googleapis.com/css2?family=Kumar+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Kumar+One&display=swap');
 
-/* ============= CRITICAL: Force Full Width ============= */
-* {
-  box-sizing: border-box;
-}
-
-html {
-  width: 100vw !important;
-  height: 100vh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow-x: hidden;
-}
-
+/* ============= Base Styles ============= */
 body {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100vw !important;
-  min-height: 100vh !important;
-  max-width: none !important; /* ← ลบการจำกัดความกว้าง */
   font-family: 'Inter', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
   line-height: 1.6;
-  overflow-x: hidden;
-}
-
-#root {
-  width: 100vw !important;
-  min-height: 100vh !important;
-  max-width: none !important; /* ← ลบการจำกัดความกว้าง */
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* ลบ container ที่อาจจำกัดความกว้าง */
-.container, 
-.wrap, 
-.page, 
-.main, 
-.app, 
-.shell,
-.layout-wrap,
-.app-container {
-  max-width: none !important;
-  width: 100% !important;
+  /* 
+    Let Tailwind handle background and text colors via classes 
+    like `bg-slate-50` and `text-slate-900` on the body or root div
+    in your main App component or layout.
+  */
 }
 
 /* ============= Auth Page Specific ============= */
@@ -139,9 +105,6 @@ select:focus-visible {
   background-color: #6366f1;
   color: white;
 }
-
-/* ============= Font Loading ============= */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 /* ============= Mobile Specific ============= */
 @media (max-width: 768px) {
