@@ -1,13 +1,201 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Kumar+One&display=swap');
+
+/* ============= CRITICAL: Force Full Width ============= */
+* {
+  box-sizing: border-box;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  min-height: 100vh !important;
+  max-width: none !important; /* ← ลบการจำกัดความกว้าง */
+  font-family: 'Inter', 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100vw !important;
+  min-height: 100vh !important;
+  max-width: none !important; /* ← ลบการจำกัดความกว้าง */
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ลบ container ที่อาจจำกัดความกว้าง */
+.container, 
+.wrap, 
+.page, 
+.main, 
+.app, 
+.shell,
+.layout-wrap,
+.app-container {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* ============= Auth Page Specific ============= */
+body.no-scroll-auth {
+  height: 100vh !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+body.no-scroll-auth * { 
+  touch-action: manipulation; 
+}
+
+/* ============= Scrollbar Styling ============= */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* ============= Focus Styles ============= */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* ============= Print Styles ============= */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ============= High Contrast Mode ============= */
+@media (prefers-contrast: high) {
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+/* ============= Reduced Motion ============= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============= Selection Styles ============= */
+::selection {
+  background-color: #6366f1;
+  color: white;
+}
+
+::-moz-selection {
+  background-color: #6366f1;
+  color: white;
+}
+
+/* ============= Font Loading ============= */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* ============= Mobile Specific ============= */
+@media (max-width: 768px) {
+  body {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
+  /* ป้องกัน zoom เมื่อ focus input */
+  input[type="tel"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* ============= iOS Safari Specific ============= */
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ============= Performance Optimizations ============= */
+.gpu-accelerate {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* ============= Utility Classes ============= */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
