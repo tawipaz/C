@@ -1,6 +1,7 @@
 // App.js (ที่แก้ไขแล้ว)
 
 import React, { useEffect, useState } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import AuthRegisterPage from "./pages/AuthRegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import PersonnelPage from "./pages/PersonnelPage";
@@ -8,6 +9,10 @@ import ShiftWorkPage from "./pages/ShiftWorkPage";
 import AppLayout from "./layouts/AppLayout";
 import ChatPage from "./pages/ChatPage";
 import AdminPage from "./pages/AdminPage";
+import OnDutyPage from './pages/OnDutyPage';
+import MockLoginPage from "./pages/MockLoginPage"; // New import
+import ProtectedRoute from "./routes/ProtectedRoute";
+
 
 const ProfilePage = ({ user }) => (
   <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
@@ -43,98 +48,75 @@ const SettingsPage = () => (
 
 function App() {
   const [user, setUser] = useState(null);
-  const [currentPath, setCurrentPath] = useState("/");
+  const [authLoading, setAuthLoading] = useState(true); // New state for auth loading
 
   useEffect(() => {
+    console.log("App.js: useEffect - checking localStorage for user...");
     const saved = localStorage.getItem("authUser");
     if (saved) {
       try {
-        setUser(JSON.parse(saved));
+        const parsedUser = JSON.parse(saved);
+        setUser(parsedUser);
+        console.log("App.js: useEffect - user found in localStorage:", parsedUser);
       } catch (error) {
-        console.error("Error parsing saved user:", error);
+        console.error("App.js: useEffect - Error parsing saved user:", error);
         localStorage.removeItem("authUser");
       }
     }
-
-    const path = window.location.pathname;
-    setCurrentPath(path);
-
-    const handlePopState = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
+    setAuthLoading(false); // Set authLoading to false after check
+    console.log("App.js: useEffect - authLoading set to false.");
   }, []);
 
   const handleLoginSuccess = (u) => {
+    console.log("App.js: handleLoginSuccess - user received:", u);
     setUser(u);
     localStorage.setItem("authUser", JSON.stringify(u));
+    console.log("App.js: handleLoginSuccess - navigating to /");
+    navigate("/"); // Navigate to dashboard after successful login
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("authUser");
-    setCurrentPath("/");
-    window.history.pushState({}, "", "/");
+    navigate("/"); // Use navigate instead of setCurrentPath and window.history.pushState
   };
 
-  const handleNavigate = (path) => {
-    setCurrentPath(path);
-    window.history.pushState({}, "", path);
-  };
+  const navigate = useNavigate();
 
   const handleOpenNotifications = () => {
     console.log("Open notifications");
     alert("การแจ้งเตือน - ฟีเจอร์นี้อยู่ระหว่างการพัฒนา");
   };
 
-  if (!user) {
-    return <AuthRegisterPage onLoginSuccess={handleLoginSuccess} />;
-  }
+  
 
-  const getCurrentPageContent = () => {
-    // --- ส่วนที่แก้ไข ---
-    // 1. สร้าง list ของ role ที่สามารถเข้าหน้าแอดมินได้
-    const allowedAdminRoles = ['super_admin', 'admin', 'supervisor', 'scheduler'];
-
-    // 2. ตรวจสอบว่า role ของ user อยู่ใน list นี้หรือไม่
-    if (user && allowedAdminRoles.includes(user.role) && currentPath === "/admin") {
-      return <AdminPage user={user} />;
-    }
-    // --- จบส่วนที่แก้ไข ---
-
-    switch (currentPath) {
-      case "/":
-        return <DashboardPage user={user} />;
-      case "/personnel":
-        return <PersonnelPage user={user} />;
-      case "/shifts":
-      case "/tasks":
-        return <ShiftWorkPage user={user} />;
-      case "/chat":
-        return <ChatPage />;
-      case "/profile":
-        return <ProfilePage user={user} />;
-      case "/settings":
-        return <SettingsPage />;
-      default:
-        return <DashboardPage user={user} />;
-    }
-  };
-
+  console.log("App.js: Rendering - user:", user, "authLoading:", authLoading);
   return (
-    <AppLayout
-      user={user}
-      currentPath={currentPath}
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-      onOpenNotifications={handleOpenNotifications}
-    >
-      {getCurrentPageContent()}
-    </AppLayout>
+    <Routes>
+      {/* Public route for OnDutyPage */}
+      <Route path="/on-duty" element={<OnDutyPage />} />
+
+      {/* Authentication route */}
+      <Route path="/auth" element={<AuthRegisterPage onLoginSuccess={handleLoginSuccess} />} />
+
+      {/* Mock Login route */}
+      <Route path="/mock-login" element={<MockLoginPage onLoginSuccess={handleLoginSuccess} />} />
+
+      {/* Protected routes - wrapped by AppLayout */}
+      <Route element={<ProtectedRoute user={user} authLoading={authLoading}><AppLayout user={user} onLogout={handleLogout} onOpenNotifications={handleOpenNotifications} /></ProtectedRoute>}>
+        <Route path="/" element={<DashboardPage user={user} />} />
+        <Route path="/personnel" element={<PersonnelPage user={user} />} />
+        <Route path="/tasks" element={<ShiftWorkPage user={user} />} />
+        <Route path="/shifts" element={<ShiftWorkPage user={user} />} />
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/profile" element={<ProfilePage user={user} />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/admin" element={<AdminPage user={user} />} />
+      </Route>
+
+      {/* Catch-all for unmatched routes */}
+      <Route path="*" element={!user ? <AuthRegisterPage onLoginSuccess={handleLoginSuccess} /> : <DashboardPage user={user} />} />
+    </Routes>
   );
 }
 

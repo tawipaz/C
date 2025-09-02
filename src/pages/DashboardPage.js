@@ -22,67 +22,7 @@ import {
   Bell
 } from "lucide-react";
 
-// Mock ข้อมูลข่าวศาล
-const mockNews = [
-  {
-    id: 1,
-    title: "ประกาศเรื่องมาตรการรักษาความปลอดภัยในช่วงเทศกาลปีใหม่ 2568",
-    content: "ศูนย์รักษาความปลอดภัยสำนักงานศาลยุติธรรม ขอแจ้งมาตรการเสริมความปลอดภัยในช่วงเทศกาลปีใหม่...",
-    category: "ประกาศ",
-    priority: "สูง",
-    author: "ศูนย์รักษาความปลอดภัย",
-    date: "2025-01-15",
-    time: "14:30",
-    views: 245,
-    status: "published"
-  },
-  {
-    id: 2,
-    title: "รายงานผลการจับกุมผู้ร้ายในคดีความผิดเกี่ยวกับยาเสพติด",
-    content: "เมื่อวันที่ 14 มกราคม 2568 เจ้าหน้าที่ตำรวจศาลได้ดำเนินการจับกุมผู้ต้องหาในคดียาเสพติด...",
-    category: "รายงาน",
-    priority: "ปกติ",
-    author: "ด.ต. สมชาย ใจดี",
-    date: "2025-01-14",
-    time: "16:45",
-    views: 156,
-    status: "published"
-  },
-  {
-    id: 3,
-    title: "การอบรมเชิงปฏิบัติการ 'เทคนิคการสืบสวนสำหรับตำรวจศาลยุคใหม่'",
-    content: "ศูนย์ฝึกอบรมแจ้งกำหนดการอบรมเชิงปฏิบัติการประจำเดือนกุมภาพันธ์ 2568...",
-    category: "อบรม",
-    priority: "ปกติ",
-    author: "ศูนย์ฝึกอบรม",
-    date: "2025-01-13",
-    time: "09:15",
-    views: 89,
-    status: "draft"
-  }
-];
-
-// Mock ข้อมูลการรายงาน
-const mockReports = [
-  {
-    id: 1,
-    title: "รายงานสถิติการปฏิบัติงานประจำเดือน ธันวาคม 2567",
-    type: "monthly",
-    submitted_by: "ร.ต.ต. ธนาวุฒิ คงดี",
-    date: "2025-01-10",
-    status: "approved"
-  },
-  {
-    id: 2,
-    title: "รายงานเหตุการณ์พิเศษ - การจับกุมผู้ต้องหาคดีขโมยรถยนต์",
-    type: "incident",
-    submitted_by: "ส.ต.ต. ปกรณ์ ศรีสวัสดิ์",
-    date: "2025-01-12",
-    status: "pending"
-  }
-];
-
-// Component สำหรับ Modal สร้างข่าว/รายงาน
+// Componentสำหรับ Modal สร้างข่าว/รายงาน
 const NewsModal = ({ isOpen, onClose, onSave, editingNews }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -281,8 +221,8 @@ export default function DashboardPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
-  const [news, setNews] = useState(mockNews);
-  const [reports, setReports] = useState(mockReports);
+  const [news, setNews] = useState([]); // <-- Removed mockNews
+  const [reports, setReports] = useState([]); // <-- Removed mockReports
   
   // Modal states
   const [showNewsModal, setShowNewsModal] = useState(false);
@@ -302,6 +242,7 @@ export default function DashboardPage({ user }) {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    // In a real app, you would fetch data here.
     setTimeout(() => setRefreshing(false), 1000);
   };
 

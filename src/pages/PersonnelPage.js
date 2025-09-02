@@ -27,17 +27,7 @@ import {
 } from "lucide-react";
 import { CONFIG } from '../config';
 
-const logAdminActivity = (action, details) => {
-  fetch(CONFIG.API_ENDPOINTS.officers, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'log_activity',
-      log_action: action,
-      log_details: details || null
-    })
-  }).catch(error => console.error('Failed to log activity:', error));
-};
+
 
 // StatCard Component
 const StatCard = memo(({ title, value, icon: Icon, color = "blue", trend, subtitle }) => (
@@ -1045,7 +1035,7 @@ export default function PersonnelPage({ user }) {
 
   const logAdminActivity = useCallback((action, details) => {
     if (!user) return;
-    fetch(CONFIG.OFFICERS_API, {
+    fetch(CONFIG.ADMIN_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1057,12 +1047,15 @@ export default function PersonnelPage({ user }) {
 
   const fetchPersonnelData = useCallback(async () => {
     try {
-      const apiUrl = new URL(CONFIG.OFFICERS_API); 
-      apiUrl.searchParams.append('action', 'get_all_officers');
+      const apiUrl = CONFIG.OFFICERS_API;
       const response = await fetch(apiUrl.toString());
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
-      const result = await response.json();
+     // Check if the response body is empty
+      const text = await response.text();
+      if (!text) throw new Error('Empty response from server');
+
+      const result = JSON.parse(text);
       let data = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
       
       const formattedData = data.map(person => ({
@@ -1085,7 +1078,7 @@ export default function PersonnelPage({ user }) {
       setError(`⚠️ ${error.message}`);
       setPersonnelData([]);
     }
-  }, [user]); // The 'user' dependency can remain
+  }, [user, CONFIG.OFFICERS_API]);
 
   useEffect(() => {
     const loadData = async () => {
