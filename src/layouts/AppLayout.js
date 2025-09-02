@@ -13,19 +13,21 @@ import {
   X,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   ChevronLeft,
   Dot,
   SlidersHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
-  ShieldAlert
+  ClipboardList
 } from "lucide-react";
 import logo from '../assets/logo.png';
 
 export default function AppLayout({
   user,
   appName = "CourtMarshalConnect",
-  onLogout
+  onLogout,
+  onOpenNotifications
 }) {
   const [showMobileSettings, setShowMobileSettings] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
@@ -50,7 +52,14 @@ export default function AppLayout({
   const navigationItems = [
     { to: "/", key: "home", label: "หน้าหลัก", icon: LayoutDashboard, description: "ภาพรวมข้อมูลทั้งหมด", badge: null },
     { to: "/personnel", key: "personnel", label: "บุคลากร", icon: UsersRound, description: "จัดการข้อมูลเจ้าหน้าที่", badge: null },
-    { to: "/tasks", key: "tasks", label: "งานและเวร", icon: CalendarCheck2, description: "จัดตารางและมอบหมายงาน", badge: null },
+    {
+      key: 'duty-management',
+      to: '/duty-management',
+      label: 'จัดการเวร',
+      description: 'ตั้งค่าและดูข้อมูลการเข้าเวร',
+      icon: ClipboardList,
+    },
+    { to: "/tasks", key: "tasks", label: "ตารางเวร", icon: CalendarCheck2, description: "จัดตารางและมอบหมายงาน", badge: null },
     { to: "/chat", key: "chat", label: "แชทหน่วย", icon: MessagesSquare, description: "สื่อสารภายในทีม", badge: null },
     { to: "/profile", key: "profile", label: "โปรไฟล์", icon: CircleUserRound, description: "ข้อมูลส่วนตัวของคุณ", badge: null },
   ];
@@ -72,10 +81,6 @@ export default function AppLayout({
 
   const closeMobileMenus = () => {
     setShowMobileSettings(false);
-  };
-
-  const onOpenNotifications = () => {
-    alert("การแจ้งเตือน - ฟีเจอร์นี้อยู่ระหว่างการพัฒนา");
   };
 
   const currentPage = navigationItems.find(item => isActive(item.to)) || { label: 'CourtMarshalConnect' };
@@ -119,12 +124,13 @@ export default function AppLayout({
                     isSidebarExpanded ? 'justify-start space-x-4' : 'justify-center'
                   } ${
                     isActive(item.to)
-                      ? 'bg-primary-600 text-white shadow-lg'
-                      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
+                  <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1.5 bg-primary-600 rounded-r-full transition-transform duration-300 ease-in-out ${isActive(item.to) ? 'scale-y-100' : 'scale-y-0'}`} />
                   <div className="relative flex-shrink-0">
-                    <item.icon className={`w-5 h-5 ${isActive(item.to) ? 'text-white' : 'text-slate-500 group-hover/item:text-slate-700'}`} />
+                    <item.icon className={`w-5 h-5 ${isActive(item.to) ? 'text-primary-600' : 'text-slate-500 group-hover/item:text-slate-700'}`} />
                     {item.badge && (
                       <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                         {item.badge}
@@ -132,18 +138,18 @@ export default function AppLayout({
                     )}
                   </div>
 
-                  <div className={`transition-all duration-300 overflow-hidden whitespace-nowrap min-w-0 flex-1 ${isSidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className={`transition-all duration-300 overflow-hidden whitespace-nowrap min-w-0 ${isSidebarExpanded ? 'flex-1 opacity-100' : 'w-0 opacity-0'}`}>
                     <div className="font-semibold text-sm">{item.label}</div>
-                    <div className={`text-xs ${isActive(item.to) ? 'text-primary-100' : 'text-slate-500'}`}>
+                    <div className={`text-xs ${isActive(item.to) ? 'text-primary-500' : 'text-slate-500'}`}>
                       {item.description}
                     </div>
                   </div>
 
-                  <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-all duration-300 ${isSidebarExpanded ? 'opacity-100' : 'opacity-0'} ${
-                    isActive(item.to) ? 'text-white' : 'text-slate-400'
+                  <ChevronRight className={`flex-shrink-0 transition-all duration-300 ${isSidebarExpanded ? 'w-4 h-4 opacity-100' : 'w-0 opacity-0'} ${
+                    isActive(item.to) ? 'text-primary-400' : 'text-slate-400'
                   }`} />
 
-                  <div className={`absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 invisible group/item-hover:opacity-100 group/item-hover:visible transition-all duration-200 whitespace-nowrap z-50 ${isSidebarExpanded ? 'hidden' : 'group-hover:visible'}`}>
+                  <div className={`absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 invisible group-hover:visible transition-all duration-200 whitespace-nowrap z-50 ${isSidebarExpanded ? 'hidden' : 'group-hover:visible'}`}>
                     {item.label}
                     <div className="absolute top-1/2 -left-1 transform -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
                   </div>
@@ -166,10 +172,10 @@ export default function AppLayout({
 
               <Link
                 to="/settings"
-                className={`w-full group/item flex items-center px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-xl transition-all duration-200 relative no-underline ${isSidebarExpanded ? 'justify-start space-x-4' : 'justify-center'}`}
+                className={`w-full group/item flex items-center px-4 py-3 text-slate-700 hover:bg-slate-100 rounded-xl transition-all duration-200 relative no-underline ${isSidebarExpanded ? 'justify-start space-x-4' : 'justify-center'}`}
               >
                 <SlidersHorizontal className="w-5 h-5 text-slate-500 flex-shrink-0" />
-                <span className={`font-medium text-sm transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                <span className={`font-medium text-sm transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
                   ตั้งค่า
                 </span>
               </Link>
@@ -179,7 +185,7 @@ export default function AppLayout({
                 className={`w-full group/item flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 relative ${isSidebarExpanded ? 'justify-start space-x-4' : 'justify-center'}`}
               >
                 <LogOut className="w-5 h-5 flex-shrink-0" />
-                <span className={`font-medium text-sm transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+                <span className={`font-medium text-sm transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarExpanded ? 'opacity-100' : 'w-0 opacity-0'}`}>
                   ออกจากระบบ
                 </span>
               </button>
@@ -298,24 +304,22 @@ export default function AppLayout({
             <Link
               key={item.key}
               to={item.to}
-              className={`flex flex-col items-center space-y-1 p-2 rounded-xl transition-all duration-200 relative transform active:scale-95 no-underline ${
+              className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-all duration-200 relative transform active:scale-95 no-underline ${
                 isActive(item.to) ? 'text-primary-600' : 'text-slate-500'
               }`}
             >
               <div className="relative">
-                <item.icon className={`w-5 h-5 ${isActive(item.to) ? 'text-primary-600' : 'text-slate-500'}`} />
+                <item.icon className="w-6 h-6" />
                 {item.badge && (
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
                     <Dot className="w-3 h-3 text-white" />
                   </span>
                 )}
               </div>
-              <span className={`text-xs font-medium ${isActive(item.to) ? 'text-primary-600' : 'text-slate-500'}`}>
+              <span className={`text-xs font-medium transition-all duration-200 ${isActive(item.to) ? 'text-primary-700' : 'text-slate-500'}`}>
                 {item.label}
               </span>
-              {isActive(item.to) && (
-                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary-600 rounded-full"></div>
-              )}
+              <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-1 w-1/2 bg-primary-600 rounded-full transition-transform duration-300 ease-out ${isActive(item.to) ? 'scale-x-100' : 'scale-x-0'}`} />
             </Link>
           ))}
         </div>

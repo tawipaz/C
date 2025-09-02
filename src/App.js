@@ -12,6 +12,7 @@ import MockLoginPage from "./pages/MockLoginPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
+import DutyManagementPage from "./pages/DutyManagementPage"; // เพิ่ม import นี้
 
 function App() {
   const [user, setUser] = useState(null);
@@ -67,6 +68,7 @@ function App() {
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/profile" element={<ProfilePage user={user} />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/duty-management" element={<DutyManagementPage />} />
           {user?.role === 'admin' && (
             <Route path="/admin" element={<AdminPage user={user} />} />
           )}
@@ -80,4 +82,3 @@ function App() {
 }
 
 export default App;
-

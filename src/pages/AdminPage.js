@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ShieldCheck, Clock, History, UserCheck, UserX, Search, Download, Check, X, RefreshCw,
-  Shield, Users, Edit2, Trash2, Save, Crown, Plus, UserCog, Building
+  ShieldCheck, History, UserCheck, UserX, Search, Download, Check, X, RefreshCw,
+  Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound
 } from "lucide-react";
 import { CONFIG } from '../config';
-
 
 // --- พจนานุกรมสำหรับแปล Action เป็นภาษาไทย ---
 const ACTION_TRANSLATIONS = {
@@ -24,243 +23,7 @@ const ACTION_TRANSLATIONS = {
   'reject_user': '👎 ปฏิเสธผู้ใช้',
 };
 
-const UnitManagement = () => {
-  const [units, setUnits] = useState([]);
-  const [officers, setOfficers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentUnit, setCurrentUnit] = useState(null);
-  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [managingUnit, setManagingUnit] = useState(null);
-  const API_URL = `${CONFIG.API_BASE_URL}/units.php`;
-
-  const fetchUnits = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}?action=get_all_units`);
-      const data = await response.json();
-      if (data.success) {
-        setUnits(data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching units:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [API_URL]);
-
-  const fetchOfficers = useCallback(async () => {
-    try {
-      const response = await fetch(`${CONFIG.OFFICERS_API}?action=get_all_officers&role=supervisor`);
-      const data = await response.json();
-      if (data.success) {
-        setOfficers(data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching officers:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchUnits();
-    fetchOfficers();
-  }, [fetchUnits, fetchOfficers]);
-
-  const handleOpenModal = (unit = null) => {
-    setCurrentUnit(unit);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setCurrentUnit(null);
-  };
-
-  const handleSaveUnit = async (unitData) => {
-    const action = unitData.id ? 'update_unit' : 'create_unit';
-    const payload = {
-      action,
-      unit_id: unitData.id,
-      unit_name: unitData.unit_name,
-      supervisor_id: unitData.supervisor_id,
-    };
-
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (result.success) {
-        fetchUnits();
-        handleCloseModal();
-      } else {
-        alert(`Error: ${result.message}`);
-      }
-    } catch (error) {
-      console.error("Error saving unit:", error);
-    }
-  };
-
-  const handleDeleteUnit = async (unitId) => {
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบหน่วยงานนี้?')) return;
-
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_unit', unit_id: unitId }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        fetchUnits();
-      } else {
-        alert(`Error: ${result.message}`);
-      }
-    } catch (error) {
-      console.error("Error deleting unit:", error);
-    }
-  };
-
-  const handleOpenMemberModal = (unit) => {
-    setManagingUnit(unit);
-    setIsMemberModalOpen(true);
-  };
-
-  const handleCloseMemberModal = () => {
-    setIsMemberModalOpen(false);
-    setManagingUnit(null);
-    fetchUnits();
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-slate-600">เพิ่ม ลบ หรือแก้ไขรายชื่อหน่วยงานในระบบ</p>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          เพิ่มหน่วยใหม่
-        </button>
-      </div>
-
-      {loading ? <p>กำลังโหลด...</p> : (
-        <div className="bg-white border border-slate-200 rounded-xl">
-          <ul className="divide-y divide-slate-200">
-            {units.length > 0 ? units.map((unit) => (
-              <li key={unit.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-slate-900 flex items-center"><Building className="w-4 h-4 mr-2 text-slate-400"/> {unit.unit_name}</p>
-                  <p className="text-sm text-slate-500 ml-6">หัวหน้าหน่วย: {unit.supervisor_name || 'ยังไม่ระบุ'}</p>
-                  <p className="text-sm text-slate-500 ml-6 mt-1">สมาชิก: {unit.members.length > 0 ? unit.members.map(m => m.name).join(', ') : 'ยังไม่มี'}</p>
-                </div>
-                <div className="flex space-x-1">
-                  <button onClick={() => handleOpenMemberModal(unit)} className="p-2 text-slate-500 hover:text-blue-600" title="จัดการสมาชิก">
-                    <Users className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => handleOpenModal(unit)} className="p-2 text-slate-500 hover:text-indigo-600" title="แก้ไขหน่วยงาน"><Edit2 className="w-5 h-5" /></button>
-                  <button onClick={() => handleDeleteUnit(unit.id)} className="p-2 text-slate-500 hover:text-red-600" title="ลบหน่วยงาน"><Trash2 className="w-5 h-5" /></button>
-                </div>
-              </li>
-            )) : <p className="p-4 text-slate-500">ยังไม่มีหน่วยงานในระบบ</p>}
-          </ul>
-        </div>
-      )}
-
-      {isModalOpen && (
-        <UnitModal
-          onClose={() => setIsModalOpen(false)}
-          unit={currentUnit}
-          officers={officers}
-          onSave={handleSaveUnit}
-        />
-      )}
-
-      {isMemberModalOpen && (
-        <ManageMembersModal
-          unit={managingUnit}
-          onClose={handleCloseMemberModal}
-          onSave={async (updatedMembers) => {
-            try {
-              const memberIds = updatedMembers.map(member => member.id);
-              await fetch(CONFIG.UNITS_API, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'update_unit_members',
-                  unit_id: managingUnit.id,
-                  member_ids: memberIds,
-                }),
-              });
-              handleCloseMemberModal();
-            } catch (error) {
-              console.error('Error saving members:', error);
-            }
-          }}
-        />
-      )}
-    </div>
-  );
-};
-
-const UnitModal = ({ unit, officers, onClose, onSave }) => {
-  const [unitName, setUnitName] = useState(unit?.unit_name || '');
-  const [supervisorId, setSupervisorId] = useState(unit?.supervisor_id || '');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave({
-      id: unit?.id,
-      unit_name: unitName,
-      supervisor_id: supervisorId,
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">{unit ? 'แก้ไขหน่วยงาน' : 'เพิ่มหน่วยงานใหม่'}</h3>
-          <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-slate-400"/></button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700">ชื่อหน่วยงาน</label>
-            <input
-              type="text"
-              value={unitName}
-              onChange={(e) => setUnitName(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">หัวหน้าหน่วย (ถ้ามี)</label>
-            <select
-              value={supervisorId}
-              onChange={(e) => setSupervisorId(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md"
-            >
-              <option value="">-- ไม่ระบุ --</option>
-              {officers.map(officer => (
-                <option key={officer.id} value={officer.id}>
-                  {officer.firstname} {officer.lastname}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end space-x-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg">ยกเลิก</button>
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg">บันทึก</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
+// --- Component: User Approval Section ---
 const UserApproval = ({ user }) => {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -271,10 +34,14 @@ const UserApproval = ({ user }) => {
       const response = await fetch(`${CONFIG.OFFICERS_API}?action=get_pending_users`);
       const data = await response.json();
       if (data.success) {
-        setPendingUsers(data.data);
+        // ป้องกันการแสดงผลผิดพลาดโดยการกรองข้อมูลที่ status เป็น pending เท่านั้น
+        setPendingUsers(Array.isArray(data.data) ? data.data.filter(u => u.status === 'pending') : []);
+      } else {
+        setPendingUsers([]);
       }
     } catch (error) {
       console.error("Error fetching pending users:", error);
+      setPendingUsers([]);
     } finally {
       setLoading(false);
     }
@@ -311,23 +78,30 @@ const UserApproval = ({ user }) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-slate-800">รายการรออนุมัติ ({pendingUsers.length})</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-slate-800">คำขอรอดำเนินการ ({pendingUsers.length})</h2>
+        <button onClick={fetchPendingUsers} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg" title="รีเฟรช">
+            <RefreshCw className="w-5 h-5" />
+        </button>
+      </div>
       {pendingUsers.length === 0 ? (
-        <p className="text-slate-500">ไม่มีผู้ใช้งานที่รอการอนุมัติ</p>
+        <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
+          <p className="text-slate-500">ไม่มีคำขอที่รอการอนุมัติในขณะนี้</p>
+        </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl">
           <ul className="divide-y divide-slate-200">
             {pendingUsers.map((pUser) => (
-              <li key={pUser.id} className="p-4 flex items-center justify-between">
+              <li key={pUser.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div>
                   <p className="font-medium text-slate-900">{pUser.prefix} {pUser.firstname} {pUser.lastname}</p>
                   <p className="text-sm text-slate-500">{pUser.position} | {pUser.phone}</p>
                 </div>
                 <div className="flex space-x-2">
-                  <button onClick={() => handleUserStatus(pUser.id, 'approved')} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
+                  <button onClick={() => handleUserStatus(pUser.id, 'approved')} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200" title="อนุมัติ">
                     <Check className="w-5 h-5" />
                   </button>
-                  <button onClick={() => handleUserStatus(pUser.id, 'rejected')} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200">
+                  <button onClick={() => handleUserStatus(pUser.id, 'rejected')} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200" title="ปฏิเสธ">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -441,7 +215,7 @@ const PersonnelManagement = ({ user }) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-slate-800">จัดการบุคลากร ({officers.length})</h2>
+        <h2 className="text-xl font-semibold text-slate-800">จัดการบัญชีผู้ใช้ ({officers.length})</h2>
         <button 
           onClick={fetchOfficers}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -486,7 +260,7 @@ const PersonnelManagement = ({ user }) => {
           </select>
           <input
             type="text"
-            placeholder="หน่วยงาน..."
+            placeholder="สังกัด/หน่วยงาน..."
             value={filters.department}
             onChange={(e) => setFilters({...filters, department: e.target.value})}
             className="w-full p-2 border border-slate-300 rounded-lg"
@@ -636,297 +410,6 @@ const EditOfficerForm = ({ officer, onSave, onCancel }) => {
       </div>
     </form>
   );
-}; // ✅ ปิดให้ครบ
-
-// --- Component: Unit Form ---
-
-const UnitForm = ({ unit, officers, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({
-    name: unit?.name || '',
-    code: unit?.code || '',
-    description: unit?.description || '',
-    supervisor_id: unit?.supervisor_id || ''
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อหน่วยงาน</label>
-        <input
-          type="text"
-          value={formData.name}
-          onChange={(e) => setFormData({...formData, name: e.target.value})}
-          className="w-full p-2 border border-slate-300 rounded-lg"
-          placeholder="เช่น ส่วนเจ้าพนักงานตำรวจศาล 1"
-          required
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">รหัสหน่วยงาน</label>
-        <input
-          type="text"
-          value={formData.code}
-          onChange={(e) => setFormData({...formData, code: e.target.value})}
-          className="w-full p-2 border border-slate-300 rounded-lg"
-          placeholder="เช่น COURT-01"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">คำอธิบาย</label>
-        <textarea
-          value={formData.description}
-          onChange={(e) => setFormData({...formData, description: e.target.value})}
-          className="w-full p-2 border border-slate-300 rounded-lg"
-          rows="3"
-          placeholder="รายละเอียดเพิ่มเติม..."
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">หัวหน้าหน่วยงาน</label>
-        <select
-          value={formData.supervisor_id}
-          onChange={(e) => setFormData({...formData, supervisor_id: e.target.value})}
-          className="w-full p-2 border border-slate-300 rounded-lg"
-        >
-          <option value="">-- เลือกหัวหน้าหน่วย --</option>
-          {officers.filter(o => o.role === 'supervisor' || o.role === 'admin').map(officer => (
-            <option key={officer.id || officer.phone} value={officer.id || officer.phone}>
-              {officer.prefix} {officer.firstname} {officer.lastname} ({officer.position})
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-slate-500 mt-1">
-          * แสดงเฉพาะเจ้าหน้าที่ที่มีสิทธิ์เป็นหัวหน้าหน่วยหรือผู้ดูแลระบบ
-        </p>
-      </div>
-      
-      <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-slate-600 hover:text-slate-800"
-        >
-          ยกเลิก
-        </button>
-        <button
-          type="submit"
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Save className="w-4 h-4" />
-          <span>บันทึก</span>
-        </button>
-      </div>
-    </form>
-  );
-};
-
-// --- Component: Activity Logs Section ---
-const ActivityLogs = () => {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ search: "", startDate: "", endDate: "" });
-
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        action: 'get_logs',
-        search: filters.search,
-        start_date: filters.startDate,
-        end_date: filters.endDate,
-      });
-
-      // --- ส่วนที่แก้ไข ---
-      // 1. เรียก API จริงโดยใช้ CONFIG.OFFICERS_API
-      const response = await fetch(`${CONFIG.OFFICERS_API}?${params.toString()}`);
-      const result = await response.json();
-
-      // 2. ตรวจสอบผลลัพธ์และอัปเดต state
-      if (result.success) {
-        setLogs(result.data);
-      } else {
-        // หาก API ส่ง error กลับมา, ให้แสดงใน console
-        console.error("API Error:", result.message);
-        setLogs([]); // ตั้งค่า logs เป็น array ว่าง
-      }
-    } catch (error) {
-      console.error("Error fetching logs:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-  
-  const exportToCSV = useCallback(() => {
-    if (logs.length === 0) return alert('ไม่มีข้อมูลสำหรับ Export');
-    const headers = ['เวลา', 'ผู้ใช้งาน', 'กิจกรรม', 'รายละเอียด', 'IP Address'];
-    const rows = logs.map(log => [
-        log.timestamp,
-        log.full_name || log.username || 'N/A',
-        ACTION_TRANSLATIONS[log.action] || log.action,
-        log.details || '',
-        log.ip_address || ''
-    ]);
-    const csvContent = [headers, ...rows].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `activity_logs_${new Date().toLocaleDateString('th-TH').replace(/\//g, '-')}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }, [logs]);
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-slate-800">ตรวจสอบกิจกรรม (Logs)</h2>
-      {/* Filters */}
-      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input type="text" placeholder="ค้นหา Username, กิจกรรม..." value={filters.search} onChange={(e) => setFilters({...filters, search: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
-        <input type="date" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
-        <input type="date" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
-        <div className="flex space-x-2">
-            <button onClick={fetchLogs} className="flex-1 flex items-center justify-center p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><Search className="w-4 h-4 mr-2" /> ค้นหา</button>
-            <button onClick={exportToCSV} className="flex items-center justify-center p-2 bg-green-600 text-white rounded-lg hover:bg-green-700"><Download className="w-4 h-4" /></button>
-        </div>
-      </div>
-      
-      {/* Log Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="p-3">เวลา</th>
-                <th className="p-3">ผู้ใช้งาน</th>
-                <th className="p-3">กิจกรรม</th>
-                <th className="p-3">รายละเอียด</th>
-                <th className="p-3">IP Address</th>
-              </tr>
-            </thead>
-            <tbody>
-            {loading ? (
-                <tr><td colSpan="5" className="text-center p-4">กำลังโหลด...</td></tr>
-            ) : logs.map(log => (
-                <tr key={log.id} className="border-t border-slate-200">
-                <td className="p-3 whitespace-nowrap">{new Date(log.timestamp).toLocaleString('th-TH')}</td>
-                <td className="p-3 font-medium text-slate-800">{log.full_name || log.username || <span className="text-slate-400">N/A</span>}</td>
-                <td className="p-3">{ACTION_TRANSLATIONS[log.action] || log.action}</td>
-                <td className="p-3 text-slate-500 max-w-xs truncate" title={log.details}>{log.details}</td>
-                <td className="p-3 text-slate-500">{log.ip_address}</td>
-                </tr>
-            ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ===================================================================
-// --- Component: Unit Management (เพิ่มส่วนนี้ทั้งหมด) ---
-
-const ManageMembersModal = ({ unit, onClose, onSave }) => {
-  const [members, setMembers] = useState(unit.members || []);
-  const [available, setAvailable] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    const fetchAvailable = async () => {
-      const response = await fetch(`${CONFIG.UNITS_API}?action=get_unassigned_officers`);
-      const data = await response.json();
-      if (data.success) setAvailable(data.data);
-    };
-    fetchAvailable();
-  }, []);
-
-  const handleAdd = (officer) => {
-    setMembers([...members, officer]);
-    setAvailable(available.filter((o) => o.id !== officer.id));
-  };
-
-  const handleRemove = (officer) => {
-    setAvailable([...available, officer]);
-    setMembers(members.filter((m) => m.id !== officer.id));
-  };
-
-  const handleSubmit = (e) => { // ไม่ต้อง async ที่นี่
-    e.preventDefault();
-    onSave(members); // ส่งแค่ array สมาชิกกลับไปให้ parent component จัดการ
-  };
-
-  const filteredAvailable = available.filter((o) =>
-    o.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold">จัดการสมาชิก: {unit.unit_name}</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100">
-            <X />
-          </button>
-        </div>
-        <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden">
-          <div className="flex flex-col border border-slate-200 rounded-lg">
-            <h3 className="p-3 bg-slate-50 font-medium border-b">สมาชิกปัจจุบัน ({members.length})</h3>
-            <ul className="p-2 overflow-y-auto">
-              {members.map((m) => (
-                <li key={m.id} className="flex justify-between items-center p-2 rounded hover:bg-slate-50">
-                  <span>{m.name}</span>
-                  <button onClick={() => handleRemove(m)} className="text-red-500 text-xs">
-                    นำออก
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex flex-col border border-slate-200 rounded-lg">
-            <div className="p-3 bg-slate-50 border-b">
-              <input
-                type="text"
-                placeholder="🔍 กรองรายชื่อ..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-2 py-1 border rounded"
-              />
-            </div>
-            <ul className="p-2 overflow-y-auto">
-              {filteredAvailable.map((o) => (
-                <li key={o.id} className="flex justify-between items-center p-2 rounded hover:bg-slate-50">
-                  <span>{o.name}</span>
-                  <button onClick={() => handleAdd(o)} className="text-green-600 text-xs">
-                    เพิ่ม
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <div className="p-4 border-t flex justify-end">
-          <button
-            onClick={handleSubmit} // Use handleSubmit instead of onSave
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg"
-          >
-            บันทึกการเปลี่ยนแปลง
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 // --- Component: Role Management Section ---
@@ -995,7 +478,7 @@ const RoleManagement = ({ user }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-800">จัดการ Role ผู้ใช้งาน</h2>
+        <h2 className="text-xl font-semibold text-slate-800">จัดการสิทธิ์ผู้ใช้</h2>
         <button onClick={() => { setRefreshing(true); fetchOfficers(); }} disabled={refreshing} className="p-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 disabled:opacity-50">
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
@@ -1044,85 +527,130 @@ const RoleManagement = ({ user }) => {
   );
 };
 
-// --- Component: Supervisor List ---
-const SupervisorList = ({ user }) => {
-    const [supervisors, setSupervisors] = useState([]);
-    const [loading, setLoading] = useState(true);
+// --- Component: Activity Logs Section ---
+const ActivityLogs = () => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({ search: "", startDate: "", endDate: "" });
 
-    const fetchSupervisors = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/officers.php?action=get_supervisors`);
-            const result = await response.json();
-            if (result.success) {
-                setSupervisors(result.data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch supervisors:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        action: 'get_logs',
+        search: filters.search,
+        start_date: filters.startDate,
+        end_date: filters.endDate,
+      });
+      const response = await fetch(`${CONFIG.OFFICERS_API}?${params.toString()}`);
+      const result = await response.json();
 
-    useEffect(() => {
-        fetchSupervisors();
-    }, [fetchSupervisors]);
+      if (result.success) {
+        setLogs(result.data);
+      } else {
+        console.error("API Error:", result.message);
+        setLogs([]);
+      }
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
-    if (loading) return <div>กำลังโหลดรายชื่อหัวหน้าส่วน...</div>;
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+  
+  const exportToCSV = useCallback(() => {
+    if (logs.length === 0) return alert('ไม่มีข้อมูลสำหรับ Export');
+    const headers = ['เวลา', 'ผู้ใช้งาน', 'กิจกรรม', 'รายละเอียด', 'IP Address'];
+    const rows = logs.map(log => [
+        log.timestamp,
+        log.full_name || log.username || 'N/A',
+        ACTION_TRANSLATIONS[log.action] || log.action,
+        log.details || '',
+        log.ip_address || ''
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\\n');
+    const blob = new Blob(['\\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `activity_logs_${new Date().toLocaleDateString('th-TH').replace(/\\//g, '-')}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [logs]);
 
-    return (
-        <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-slate-800">รายชื่อหัวหน้าส่วน</h2>
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <ul className="divide-y divide-slate-200">
-                    {supervisors.map(sv => (
-                        <li key={sv.id} className="p-4">
-                            <p className="font-medium text-slate-900">{sv.prefix} {sv.firstname} {sv.lastname}</p>
-                            <p className="text-sm text-slate-500">{sv.position}</p>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold text-slate-800">บันทึกกิจกรรมระบบ</h2>
+      {/* Filters */}
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <input type="text" placeholder="ค้นหา Username, กิจกรรม..." value={filters.search} onChange={(e) => setFilters({...filters, search: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
+        <input type="date" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
+        <input type="date" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} className="w-full p-2 border border-slate-300 rounded-lg" />
+        <div className="flex space-x-2">
+            <button onClick={fetchLogs} className="flex-1 flex items-center justify-center p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><Search className="w-4 h-4 mr-2" /> ค้นหา</button>
+            <button onClick={exportToCSV} className="flex items-center justify-center p-2 bg-green-600 text-white rounded-lg hover:bg-green-700"><Download className="w-4 h-4" /></button>
         </div>
-    );
+      </div>
+      
+      {/* Log Table */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="p-3">เวลา</th>
+                <th className="p-3">ผู้ใช้งาน</th>
+                <th className="p-3">กิจกรรม</th>
+                <th className="p-3">รายละเอียด</th>
+                <th className="p-3">IP Address</th>
+              </tr>
+            </thead>
+            <tbody>
+            {loading ? (
+                <tr><td colSpan="5" className="text-center p-4">กำลังโหลด...</td></tr>
+            ) : logs.map(log => (
+                <tr key={log.id} className="border-t border-slate-200">
+                <td className="p-3 whitespace-nowrap">{new Date(log.timestamp).toLocaleString('th-TH')}</td>
+                <td className="p-3 font-medium text-slate-800">{log.full_name || log.username || <span className="text-slate-400">N/A</span>}</td>
+                <td className="p-3">{ACTION_TRANSLATIONS[log.action] || log.action}</td>
+                <td className="p-3 text-slate-500 max-w-xs truncate" title={log.details}>{log.details}</td>
+                <td className="p-3 text-slate-500">{log.ip_address}</td>
+                </tr>
+            ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-const allTabs = [
-  { key: 'approval', label: 'อนุมัติผู้ใช้', icon: UserCheck, roles: ['super_admin', 'admin'] },
-  { key: 'units', label: 'จัดการส่วนงาน(สำหรับเวร)', icon: Building, roles: ['super_admin', 'admin', 'supervisor', 'scheduler'] },
-  { key: 'roles', label: 'จัดการสถานะผู้ใช้', icon: UserCog, roles: ['super_admin', 'admin'] },
-  { key: 'logs', label: 'ตรวจสอบ Logs', icon: History, roles: ['super_admin', 'admin', 'supervisor'] },
-];
-
+// --- Main Component: AdminPage ---
 export default function AdminPage({ user }) {
-    // 2. กรอง Tab ที่จะแสดงตาม role ของ user
+    const allTabs = [
+      { key: 'approval', label: 'คำขออนุมัติ', icon: UserCheck, component: <UserApproval user={user} />, roles: ['super_admin', 'admin'] },
+      { key: 'personnel', label: 'จัดการบัญชี', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },
+      { key: 'roles', label: 'จัดการสิทธิ์', icon: KeyRound, component: <RoleManagement user={user}/>, roles: ['super_admin', 'admin']},
+      { key: 'logs', label: 'บันทึกกิจกรรม', icon: History, component: <ActivityLogs />, roles: ['super_admin', 'admin', 'supervisor'] },
+    ];
+
     const visibleTabs = useMemo(() => {
         if (!user || !user.role) return [];
-        // admin และ super_admin เห็นทุก Tab ที่มีใน allTabs
         if (user.role === 'super_admin' || user.role === 'admin') {
             return allTabs;
         }
-        // สำหรับ role อื่นๆ ให้กรองเฉพาะ Tab ที่มี role ของ user นั้นๆ อยู่ใน property 'roles'
         return allTabs.filter(tab => tab.roles.includes(user.role));
     }, [user]);
 
-    // 3. ตั้งค่า activeTab เริ่มต้นให้เป็น Tab แรกที่ user คนนั้นมองเห็น
     const [activeTab, setActiveTab] = useState(visibleTabs[0]?.key || '');
 
-    const renderContent = () => {
-      switch (activeTab) {
-        case 'approval':
-          return <UserApproval user={user} />;
-        case 'units':
-          return <UnitManagement />;
-        case 'roles':
-          return <RoleManagement user={user}/>;
-        case 'logs':
-          return <ActivityLogs />;
-        default:
-          return <div className="text-slate-500">คุณไม่มีสิทธิ์เข้าถึงส่วนนี้</div>;
-      }
-    };
+    const activeComponent = useMemo(() => {
+      const currentTab = visibleTabs.find(tab => tab.key === activeTab);
+      return currentTab ? currentTab.component : <div className="text-slate-500">คุณไม่มีสิทธิ์เข้าถึงส่วนนี้</div>;
+    }, [activeTab, visibleTabs]);
 
     return (
       <div className="space-y-6">
@@ -1131,16 +659,15 @@ export default function AdminPage({ user }) {
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center">
               <ShieldCheck className="w-6 h-6 mr-3 text-indigo-600" />
-              แผงควบคุมผู้ดูแลระบบ
+              แผงควบคุมความปลอดภัย
             </h1>
-            <p className="text-slate-600">จัดการส่วนต่างๆ ของระบบ</p>
+            <p className="text-slate-600">จัดการการเข้าถึงและตรวจสอบกิจกรรมในระบบ</p>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="border-b border-slate-200">
-          <nav className="flex space-x-4 overflow-x-auto pb-px">
-            {/* 4. เปลี่ยนไป map 'visibleTabs' แทน 'tabs' เดิม */}
+          <nav className="flex space-x-1 overflow-x-auto pb-px">
             {visibleTabs.map(tab => (
               <button
                 key={tab.key}
@@ -1159,8 +686,8 @@ export default function AdminPage({ user }) {
         </div>
 
         {/* Content */}
-        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 min-h-[400px]">
-          {renderContent()}
+        <div className="bg-slate-100 p-6 rounded-b-xl rounded-tr-xl border border-slate-200 min-h-[400px]">
+          {activeComponent}
         </div>
       </div>
     );

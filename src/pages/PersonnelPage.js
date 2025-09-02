@@ -798,7 +798,7 @@ const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
                   {[
                     { label: 'ตำแหน่ง', value: person.position, icon: Award },
                     { label: 'สังกัด', value: person.affiliation, icon: Building2 },
-                    { label: 'แผนก', value: person.deph, icon: Briefcase },
+                    { label: 'หน่วยงาน/ส่วนงาน', value: person.deph, icon: Briefcase },
                     { label: 'รุ่น', value: person.generation, icon: GraduationCap },
                   ].map((item, index) => (
                     <div key={index} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0">
