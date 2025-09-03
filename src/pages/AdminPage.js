@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ShieldCheck, History, UserCheck, UserX, Search, Download, Check, X, RefreshCw,
-  Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound
+  Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound, Database
 } from "lucide-react";
 import { CONFIG } from '../config';
 
@@ -611,12 +611,166 @@ const ActivityLogs = () => {
   );
 };
 
+// --- Component: Database Manager (Admin) ---
+const DatabaseManager = ({ user }) => {
+  const [tables, setTables] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [newTableName, setNewTableName] = useState('');
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState('text');
+
+  const apiBase = CONFIG.API_BASE_URL || '';
+
+  const fetchTables = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/admin/db/tables`);
+      const data = await res.json();
+      if (data && Array.isArray(data.tables)) setTables(data.tables);
+      else setTables([]);
+    } catch (err) {
+      console.error('Error fetching tables', err);
+      setTables([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase]);
+
+  useEffect(() => { fetchTables(); }, [fetchTables]);
+
+  const handleCreateTable = async () => {
+    if (!newTableName.trim()) return alert('กรุณาระบุชื่อฐานข้อมูล (table name)');
+    try {
+      const res = await fetch(`${apiBase}/admin/db/tables`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: newTableName })
+      });
+      const d = await res.json();
+      if (d.success) { setNewTableName(''); fetchTables(); }
+      else alert(d.message || 'ไม่สามารถสร้างตารางได้');
+    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+  };
+
+  const handleDropTable = async (table) => {
+    if (!window.confirm(`ลบตาราง ${table} ?`)) return;
+    try {
+      const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}`, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) fetchTables(); else alert(d.message || 'ลบไม่สำเร็จ');
+    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+  };
+
+  const handleAddColumn = async (table) => {
+    if (!newColumnName.trim()) return alert('กรุณาระบุชื่อคอลัมน์');
+    try {
+      const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}/columns`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column: newColumnName, type: newColumnType })
+      });
+      const d = await res.json();
+      if (d.success) { setNewColumnName(''); setNewColumnType('text'); fetchTables(); }
+      else alert(d.message || 'ไม่สามารถเพิ่มคอลัมน์ได้');
+    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+  };
+
+  const handleDropColumn = async (table, column) => {
+    if (!window.confirm(`ลบคอลัมน์ ${column} จาก ${table} ?`)) return;
+    try {
+      const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}/columns/${encodeURIComponent(column)}`, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) fetchTables(); else alert(d.message || 'ลบคอลัมน์ไม่สำเร็จ');
+    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">จัดการฐานข้อมูล</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchTables} className="px-3 py-2 bg-slate-100 rounded">รีเฟรช</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2 space-y-3">
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm text-slate-600">ตารางทั้งหมด</div>
+              <div className="text-sm text-slate-500">{tables.length} รายการ</div>
+            </div>
+            {loading ? (
+              <div className="p-6 text-center">กำลังโหลด...</div>
+            ) : (
+              <div className="space-y-2">
+                {tables.map(t => (
+                  <div key={t.name} className="p-3 bg-slate-50 rounded flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{t.name}</div>
+                      <div className="text-xs text-slate-500">{(t.columns||[]).length} คอลัมน์</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setSelectedTable(t.name)} className="px-2 py-1 bg-white border rounded">ดูคอลัมน์</button>
+                      <button onClick={() => handleDropTable(t.name)} className="px-2 py-1 bg-red-100 text-red-700 rounded">ลบ</button>
+                    </div>
+                  </div>
+                ))}
+                {tables.length === 0 && <div className="p-4 text-slate-500">ไม่มีตาราง</div>}
+              </div>
+            )}
+          </div>
+
+          {selectedTable && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-medium">คอลัมน์: {selectedTable}</div>
+                <button onClick={() => setSelectedTable(null)} className="text-slate-500">ปิด</button>
+              </div>
+              <div className="space-y-2">
+                {(tables.find(x => x.name === selectedTable)?.columns || []).map(c => (
+                  <div key={c.name} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                    <div><strong>{c.name}</strong> <span className="text-xs text-slate-500">{c.type}</span></div>
+                    <button onClick={() => handleDropColumn(selectedTable, c.name)} className="text-red-600 text-sm">ลบ</button>
+                  </div>
+                ))}
+                {(tables.find(x => x.name === selectedTable)?.columns || []).length === 0 && <div className="text-slate-500">ไม่มีคอลัมน์</div>}
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <input placeholder="ชื่อคอลัมน์" value={newColumnName} onChange={e => setNewColumnName(e.target.value)} className="p-2 border rounded" />
+                  <select value={newColumnType} onChange={e => setNewColumnType(e.target.value)} className="p-2 border rounded">
+                    <option value="text">text</option>
+                    <option value="integer">integer</option>
+                    <option value="boolean">boolean</option>
+                    <option value="timestamp">timestamp</option>
+                  </select>
+                  <button onClick={() => handleAddColumn(selectedTable)} className="px-3 py-2 bg-indigo-600 text-white rounded">เพิ่มคอลัมน์</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="text-sm text-slate-600 mb-2">สร้างตารางใหม่</div>
+            <input placeholder="ชื่อตาราง (table_name)" value={newTableName} onChange={e => setNewTableName(e.target.value)} className="w-full p-2 border rounded mb-2" />
+            <div className="flex gap-2">
+              <button onClick={handleCreateTable} className="px-3 py-2 bg-indigo-600 text-white rounded">สร้าง</button>
+              <button onClick={() => setNewTableName('')} className="px-3 py-2 bg-slate-100 rounded">ยกเลิก</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Component: AdminPage ---
 export default function AdminPage({ user }) {
     const allTabs = [
       { key: 'approval', label: 'คำขออนุมัติ', icon: UserCheck, component: <UserApproval user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'personnel', label: 'จัดการบุคลากร', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'logs', label: 'บันทึกกิจกรรม', icon: History, component: <ActivityLogs />, roles: ['super_admin', 'admin', 'supervisor'] },
+      { key: 'database', label: 'ฐานข้อมูล', icon: Database, component: <DatabaseManager user={user} />, roles: ['admin'] },
     ];
 
     const visibleTabs = useMemo(() => {

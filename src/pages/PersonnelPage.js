@@ -23,9 +23,13 @@ import {
   CheckCircle2,
   Clock,
   Briefcase,
-  GraduationCap
+  GraduationCap,
+  Edit2,
+  Save
 } from "lucide-react";
 import { CONFIG } from '../config';
+import DonutChart from '../components/DonutChart';
+import LineChart from '../components/LineChart';
 
 
 
@@ -118,7 +122,17 @@ const truncatePosition = (position) => {
 // Function สำหรับตัดคำ "ศาล" ออกจากสังกัด
 const truncateAffiliation = (affiliation) => {
   if (!affiliation) return '';
-  return affiliation.replace(/ศาล/gi, '').trim() || affiliation;
+  const lower = affiliation.toLowerCase();
+
+  // Only remove the leading word 'ศาล' for affiliations that describe
+  // 'ในสังกัดสำนักยุติธรรมประจำภาค' (or variants). Do not strip 'ศาล'
+  // from other court names like 'ศาลสูง' or 'ศาลชำนาญพิเศษ'.
+  if (lower.includes('ในสังกัดสำนักยุติธรรมประจำภาค') || lower.includes('ในสังกัดสำนักยุติธรรม')) {
+    return affiliation.replace(/^ศาล\s*/i, '').trim() || affiliation;
+  }
+
+  // Otherwise return affiliation unchanged
+  return affiliation;
 };
 
 // --- NEW: Proportional Treemap Chart Component ---
@@ -400,11 +414,8 @@ const PieChartComponent = memo(({ title, data, colors = [] }) => {
   );
 });
 
-// Paste this code right after the PieChartComponent code block
-
 // Horizontal Bar Chart Component
-// Horizontal Bar Chart Component
-const HorizontalBarChart = memo(({ title, data, colors = [] }) => {
+const HorizontalBarChart = memo(({ title, data, colors = [], maxHeight = '320px' }) => {
   
   const getSortOrder = (label) => {
     const regionMatch = label.match(/ภาค\s*(\d+)/);
@@ -435,17 +446,17 @@ const HorizontalBarChart = memo(({ title, data, colors = [] }) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-slate-400" />{title}</h3>
-      <div className="space-y-3">
-        {data.map((item, index) => {
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+      <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-slate-400" />{title}</h3>
+      <div className="space-y-2" style={{ maxHeight, overflowY: 'auto', paddingRight: 8 }}>
+        {sortedData.map((item, index) => {
           const barWidth = (item.value / maxValue) * 100;
           const color = colors[index % colors.length] || '#8b5cf6';
           
           return (
             <div key={`${item.label}-${index}`} className="grid grid-cols-3 gap-2 items-center">
               {/* Left Column for Full Label (CHANGED to text-left) */}
-              <div className="col-span-1 text-sm text-slate-700 font-medium text-left" title={item.label}>
+              <div className="col-span-1 text-sm text-slate-700 font-medium text-left truncate" title={item.label}>
                 {item.label}
               </div>
               
@@ -454,7 +465,7 @@ const HorizontalBarChart = memo(({ title, data, colors = [] }) => {
                 <div
                   className="h-7 rounded-full transition-all duration-700 flex items-center justify-end pr-3"
                   style={{
-                    width: `${barWidth}%`, backgroundColor: color, minWidth: '40px'
+                    width: `${barWidth}%`, backgroundColor: color, minWidth: '36px'
                   }}
                 >
                    <span className="text-white text-sm font-bold">{item.value}</span>
@@ -468,352 +479,94 @@ const HorizontalBarChart = memo(({ title, data, colors = [] }) => {
   );
 });
 
-// Bar Chart Component
-const BarChart = memo(({ title, data, colors = [] }) => {
-  const maxValue = useMemo(() => Math.max(...data.map(d => d.value)), [data]);
-  
+// (moved into the PersonnelPage component to avoid calling hooks at top level)
+
+// EditableCard Component (restored minimal implementation)
+const EditableCard = memo(({ title, value, icon: Icon, color = "blue", isEditing, onEdit, onChange, isAdmin }) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (e) => {
+    const newValue = parseInt(e.target.value) || 0;
+    setLocalValue(newValue);
+    onChange(newValue);
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-        <BarChart3 className="w-5 h-5 mr-2 text-slate-400" />
-        {title}
-      </h3>
-      <div className="h-48 flex items-end justify-between space-x-1">
-        {data.slice(0, 8).map((item, index) => {
-          const height = (item.value / maxValue) * 100;
-          const color = colors[index % colors.length] || '#6366f1';
-          
-          return (
-            <div key={`bar-${item.label}-${index}`} className="flex-1 flex flex-col items-center max-w-[60px]">
-              <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden" style={{ height: '160px' }}>
-                <div 
-                  className="absolute bottom-0 w-full rounded-t-lg transition-all duration-700 flex items-end justify-center pb-1"
-                  style={{ 
-                    height: `${height}%`,
-                    backgroundColor: color
-                  }}
-                >
-                  <span className="text-white text-xs font-medium">
-                    {item.value}
-                  </span>
-                </div>
-              </div>
-              <div className="text-xs text-slate-600 mt-2 text-center truncate w-full" title={item.label}>
-                {item.label.length > 8 ? item.label.slice(0, 8) + '...' : item.label}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-// Personnel Card Component (MODIFIED)
-const PersonnelCard = memo(({ person, onView }) => (
-  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 hover:shadow-lg transition-shadow duration-200 group relative">
-    <button
-      onClick={() => onView(person)}
-      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none"
-      title="ดูรายละเอียด"
-    >
-      <Eye className="w-4 h-4" />
-    </button>
-
-    <div className="flex items-start space-x-3 mb-3 pr-8">
-      <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-        <span className="text-white text-sm font-bold">
-          {person.firstname?.charAt(0) || "?"}
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold text-slate-900 truncate">
-          {person.prefix} {person.firstname} {person.lastname}
-        </h3>
-        <p className="text-slate-600 text-xs truncate">{person.position || 'ไม่ระบุตำแหน่ง'}</p>
-        {person.generation && (
-          <span className="inline-flex mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
-            รุ่น {person.generation}
-          </span>
+      <div className="flex items-center justify-between mb-2">
+        <div className={`w-12 h-12 bg-${color}-100 rounded-xl flex items-center justify-center`}>
+          {Icon && <Icon className={`w-6 h-6 text-${color}-600`} />}
+        </div>
+        {isAdmin && (
+          <button
+            onClick={onEdit}
+            className="text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {isEditing ? <Save className="w-5 h-5" /> : <Edit2 className="w-5 h-5" />}
+          </button>
         )}
       </div>
-    </div>
-
-    <div className="space-y-2 text-xs">
-      {person.affiliation && (
-        <div className="flex items-center text-slate-600">
-          <Building2 className="w-3 h-3 mr-1.5 flex-shrink-0" />
-          <span className="truncate">{person.affiliation}</span>
-        </div>
+      {isEditing ? (
+        <input
+          type="number"
+          value={localValue}
+          onChange={handleChange}
+          className="w-full text-3xl font-bold text-slate-900 mb-1 bg-slate-50 border border-slate-200 rounded px-2 py-1"
+          min="0"
+        />
+      ) : (
+        <div className="text-3xl font-bold text-slate-900 mb-1">{localValue}</div>
       )}
-      
-      {person.phone && (
-        <div className="flex items-center text-slate-600">
-          <Phone className="w-3 h-3 mr-1.5 flex-shrink-0" />
-          <span>{person.phone}</span>
-        </div>
-      )}
-
-      {/* --- ADDED: Display Birthday on Card --- */}
-      {person.dob && (
-        <div className="flex items-center text-slate-600">
-          <Calendar className="w-3 h-3 mr-1.5 flex-shrink-0" />
-          <span>{person.dob}</span>
-        </div>
-      )}
-    </div>
-  </div>
-));
-
-// Filter Panel Component
-// Filter Panel Component (MODIFIED)
-const FilterPanel = memo(({ filters, onFiltersChange, stats, personnelData, isOpen, onToggle }) => {
-  // --- MODIFIED: Logic for dynamic department options ---
-  const departmentOptions = useMemo(() => {
-    // If no affiliation is selected, show all departments from stats
-    if (!filters.affiliation) {
-      return Object.entries(stats.byDepartment).sort(([a], [b]) => a.localeCompare(b));
-    }
-
-    // If an affiliation IS selected, filter personnel to find departments within it
-    const personnelInAffiliation = personnelData.filter(p => p.affiliation === filters.affiliation);
-    
-    const departmentsInAffiliation = personnelInAffiliation.reduce((acc, person) => {
-      const dept = person.deph || 'ไม่ระบุ';
-      acc[dept] = (acc[dept] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(departmentsInAffiliation).sort(([a], [b]) => a.localeCompare(b));
-  }, [filters.affiliation, personnelData, stats.byDepartment]);
-
-  const sortedAffiliations = useMemo(() => 
-    Object.entries(stats.byAffiliation).sort(([a], [b]) => a.localeCompare(b)),
-    [stats.byAffiliation]
-  );
-
-  const sortedPositions = useMemo(() => 
-    Object.entries(stats.byPosition).sort(([a], [b]) => a.localeCompare(b)),
-    [stats.byPosition]
-  );
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-slate-900">ตัวกรอง</h3>
-        <button onClick={onToggle} className="text-slate-400 hover:text-slate-600">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* ตำแหน่ง Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">ตำแหน่ง</label>
-          <select
-            value={filters.position}
-            onChange={(e) => onFiltersChange({ ...filters, position: e.target.value })}
-            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-          >
-            <option value="">ทั้งหมด</option>
-            {sortedPositions.map(([position, count]) => (
-              <option key={position} value={position}>
-                {position} ({count})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* สังกัด Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">สังกัด</label>
-          <select
-            value={filters.affiliation}
-            onChange={(e) => onFiltersChange({ ...filters, affiliation: e.target.value, deph: '' })}
-            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-          >
-            <option value="">ทั้งหมด</option>
-            {sortedAffiliations.map(([affiliation, count]) => (
-              <option key={affiliation} value={affiliation}>
-                {affiliation} ({count})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* หน่วยงาน Dropdown (Now correctly filtered) */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">หน่วยงาน</label>
-          <select
-            value={filters.deph}
-            onChange={(e) => onFiltersChange({ ...filters, deph: e.target.value })}
-            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-            disabled={!filters.affiliation} // Disabled if no affiliation is selected
-          >
-            <option value="">ทั้งหมด</option>
-            {departmentOptions.map(([dept, count]) => (
-              <option key={dept} value={dept}>
-                {dept} ({count})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* รุ่น Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">รุ่น</label>
-          <select
-            value={filters.generation}
-            onChange={(e) => onFiltersChange({ ...filters, generation: e.target.value })}
-            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-          >
-            <option value="">ทั้งหมด</option>
-            {Object.entries(stats.byGeneration)
-              .sort(([a], [b]) => (parseInt(a) || 0) - (parseInt(b) || 0))
-              .map(([generation, count]) => (
-                <option key={generation} value={generation}>
-                  รุ่น {generation} ({count} คน)
-                </option>
-              ))}
-          </select>
-        </div>
-
-        {/* สถานะการเชื่อมต่อ Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">สถานะการเชื่อมต่อ</label>
-          <select
-            value={filters.connected}
-            onChange={(e) => onFiltersChange({ ...filters, connected: e.target.value })}
-            className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-          >
-            <option value="">ทั้งหมด</option>
-            <option value="true">เชื่อมต่อแล้ว</option>
-            <option value="false">ยังไม่เชื่อมต่อ</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-        <div className="text-sm text-slate-600">
-          พบ {Object.values(filters).filter(v => v && v !== filters.search).length} ตัวกรองที่ใช้งาน
-        </div>
-        <button
-          onClick={() => onFiltersChange({ position: '', affiliation: '', deph: '', generation: '', connected: '', search: filters.search })}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          ล้างตัวกรองทั้งหมด
-        </button>
-      </div>
+      <div className="text-sm text-slate-600">{title}</div>
     </div>
   );
 });
 
-
-// Detail Modal Component (MODIFIED)
+// PersonnelDetailModal (minimal)
 const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
   if (!isOpen || !person) return null;
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-60 overflow-y-auto bg-black/40">
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
-        
-        <div className="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-3xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900">รายละเอียดบุคลากร</h2>
-              <button
-                onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
+        <div className="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-600">{(person.firstname||'').charAt(0)}{(person.lastname||'').charAt(0)}</div>
+              <div>
+                <div className="text-lg font-semibold">{person.prefix} {person.firstname} {person.lastname}</div>
+                <div className="text-sm text-slate-500">{person.position || '-'} • {person.affiliation || '-'}</div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {person.phone && (
+                <a href={`tel:${person.phone}`} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded text-sm" title="โทร">
+                  <Phone className="w-4 h-4 text-slate-600" />
+                  <span>โทร</span>
+                </a>
+              )}
+              {person.email && (
+                <a href={`mailto:${person.email}`} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded text-sm" title="อีเมล">
+                  <Mail className="w-4 h-4 text-slate-600" />
+                  <span>อีเมล</span>
+                </a>
+              )}
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg" aria-label="ปิด">
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="flex items-center space-x-6 mb-6 p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white">
-              <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center">
-                <span className="text-2xl font-bold">
-                  {person.firstname?.charAt(0) || "?"}
-                </span>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-1">
-                  {person.prefix} {person.firstname} {person.lastname}
-                </h3>
-                <p className="text-white/90 mb-2">{person.position || 'ไม่ระบุตำแหน่ง'}</p>
-                <div className="flex items-center space-x-4 text-sm">
-                  
-                  {/* --- REMOVED: Connection status span was here --- */}
-                  
-                  {person.generation && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-400/20 text-blue-100">
-                      <GraduationCap className="w-3 h-3 mr-1" />
-                      รุ่น {person.generation}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 flex items-center">
-                  <Users className="w-4 h-4 mr-2" />
-                  ข้อมูลส่วนตัว
-                </h4>
-                
-                <div className="space-y-3">
-                  {[
-                    { label: 'คำนำหน้า', value: person.prefix },
-                    { label: 'ชื่อ', value: person.firstname },
-                    { label: 'นามสกุล', value: person.lastname },
-                    { label: 'วันเกิด', value: person.dob },
-                    { label: 'เบอร์โทรศัพท์', value: person.phone, icon: Phone },
-                    { label: 'อีเมล', value: person.email, icon: Mail },
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0">
-                      <div className="flex items-center text-slate-600">
-                        {item.icon && <item.icon className="w-4 h-4 mr-2" />}
-                        <span className="text-sm">{item.label}</span>
-                      </div>
-                      <span className="text-slate-900 font-medium text-right max-w-[60%] break-words">
-                        {item.value || '-'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 flex items-center">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  ข้อมูลการทำงาน
-                </h4>
-                
-                <div className="space-y-3">
-                  {[
-                    { label: 'ตำแหน่ง', value: person.position, icon: Award },
-                    { label: 'สังกัด', value: person.affiliation, icon: Building2 },
-                    { label: 'หน่วยงาน/ส่วนงาน', value: person.deph, icon: Briefcase },
-                    { label: 'รุ่น', value: person.generation, icon: GraduationCap },
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0">
-                      <div className="flex items-center text-slate-600">
-                        {item.icon && <item.icon className="w-4 h-4 mr-2" />}
-                        <span className="text-sm">{item.label}</span>
-                      </div>
-                      <span className="text-slate-900 font-medium text-right max-w-[60%] break-words">
-                        {item.value || '-'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 gap-3">
+            <div><strong>หน่วยงาน:</strong> {person.deph || '-'}</div>
+            <div><strong>เบอร์โทรศัพท์:</strong> {person.phone || '-'}</div>
+            <div><strong>อีเมล:</strong> {person.email || '-'}</div>
+            <div><strong>วันเกิด:</strong> {person.dob || '-'}</div>
+            <div><strong>Line ID:</strong> {person.lineUserId || '-'}</div>
+            <div><strong>บทบาท:</strong> {person.role || '-'}</div>
           </div>
         </div>
       </div>
@@ -821,209 +574,118 @@ const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
   );
 });
 
-// --- NEW COMPONENT: SearchModal (Modified) ---
-const SearchModal = memo(({ 
-  isOpen, 
-  onClose, 
-  personnelData, 
-  stats, 
-  onViewPerson, 
-  onExport, 
-  user 
-}) => {
-  const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // New state to track if a search has been initiated
-  const [hasSearched, setHasSearched] = useState(false);
+// SearchModal (minimal placeholder)
+// Small visual card for a person used in search results (minimal + icon)
+const PersonCard = memo(({ person, onView, onCall, onMail }) => {
+  return (
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-lg">
+          {(person.firstname||'').charAt(0)}{(person.lastname||'').charAt(0)}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-slate-900 truncate">{person.prefix} {person.firstname} {person.lastname}</div>
+          <div className="text-xs text-slate-500 truncate flex items-center gap-2">
+            <Building2 className="w-3 h-3 text-slate-400" />
+            <span>{person.affiliation || '-'}</span>
+            <span className="mx-1">•</span>
+            <span>{person.position || '-'}</span>
+          </div>
+        </div>
+      </div>
 
-  const [filters, setFilters] = useState({
-    search: "", position: "", affiliation: "", deph: "", generation: "", connected: ""
-  });
+      <div className="flex items-center gap-2">
+        {person.phone && (
+          <button onClick={() => onCall(person.phone)} className="p-2 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600" title="โทร">
+            <Phone className="w-4 h-4" />
+          </button>
+        )}
+        {person.email && (
+          <button onClick={() => onMail(person.email)} className="p-2 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600" title="อีเมล">
+            <Mail className="w-4 h-4" />
+          </button>
+        )}
+        <button onClick={() => onView(person)} className="px-3 py-1 bg-indigo-600 text-white rounded-md text-sm flex items-center gap-2">
+          <Eye className="w-4 h-4" /> ดู
+        </button>
+      </div>
+    </div>
+  );
+});
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+const SearchModal = memo(({ isOpen, onClose, personnelData = [], stats = {}, onViewPerson = () => {}, onExport = () => {}, user }) => {
+  const [query, setQuery] = useState('');
+  const [filterAff, setFilterAff] = useState('');
+  const [filterPos, setFilterPos] = useState('');
 
-  useEffect(() => {
-    // Automatically apply debounced search to filters if a search is active
-    if (hasSearched) {
-      setFilters(prev => ({ ...prev, search: debouncedSearch }));
-    }
-  }, [debouncedSearch, hasSearched]);
+  const affiliations = useMemo(() => {
+    const setAff = new Set();
+    personnelData.forEach(p => setAff.add(p.affiliation || 'ไม่ระบุ'));
+    return Array.from(setAff).sort();
+  }, [personnelData]);
 
-  const filteredPersonnel = useMemo(() => {
-    // Only filter data if a search has been triggered
-    if (!hasSearched || !personnelData.length) return [];
-    
-    return personnelData.filter(person => {
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase().trim();
-        const searchableFields = [
-          person.firstname, person.lastname, person.position, person.affiliation,
-          person.deph, person.phone, person.email, person.prefix,
-          person.generation ? `รุ่น${person.generation}` : '',
-          person.generation ? `รุ่น ${person.generation}` : '',
-          person.generation ? person.generation.toString() : ''
-        ];
-        const searchableText = searchableFields.filter(Boolean).join(' ').toLowerCase();
-        if (!searchableText.includes(searchTerm)) return false;
-      }
-      if (filters.position && person.position !== filters.position) return false;
-      if (filters.affiliation && person.affiliation !== filters.affiliation) return false;
-      if (filters.deph && person.deph !== filters.deph) return false;
-      if (filters.generation && (String(person.generation).trim() !== filters.generation)) return false;
-      return true;
-    });
-  }, [personnelData, filters, hasSearched]); // hasSearched is now a dependency
-  
-  const handleFiltersChange = useCallback((newFilters) => {
-    setFilters(newFilters);
-    // If filters are changed, we consider it a new search action
-    if (!hasSearched) setHasSearched(true);
-  }, [hasSearched]);
-
-  const clearAllFilters = useCallback(() => {
-    setFilters({ search: "", position: "", affiliation: "", deph: "", generation: "", connected: "" });
-    setSearchInput("");
-    // Reset the search state to hide results
-    setHasSearched(false); 
-  }, []);
-
-  const handleSearchClick = () => {
-    // Trigger the search and apply the current search input to filters
-    setFilters(prev => ({ ...prev, search: searchInput }));
-    setHasSearched(true);
-  };
+  const positions = useMemo(() => {
+    const s = new Set();
+    personnelData.forEach(p => s.add(p.position || 'ไม่ระบุ'));
+    return Array.from(s).sort();
+  }, [personnelData]);
 
   if (!isOpen) return null;
+
+  const results = personnelData.filter(p => {
+    const hay = `${p.firstname} ${p.lastname} ${p.position || ''} ${p.affiliation || ''}`.toLowerCase();
+    if (!hay.includes(query.toLowerCase())) return false;
+    if (filterAff && (p.affiliation || 'ไม่ระบุ') !== filterAff) return false;
+    if (filterPos && (p.position || 'ไม่ระบุ') !== filterPos) return false;
+    return true;
+  });
+
+  const handleCall = (tel) => window.open(`tel:${tel}`, '_self');
+  const handleMail = (email) => window.open(`mailto:${email}`, '_self');
+
+  const clearFilters = () => { setFilterAff(''); setFilterPos(''); setQuery(''); };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60">
       <div className="flex min-h-screen items-start justify-center p-4 sm:p-6 md:p-10">
-        <div className="relative bg-slate-50 rounded-3xl shadow-2xl max-w-7xl w-full"> {/* Increased max-width for better layout */}
-          <div className="sticky top-0 bg-slate-50/80 backdrop-blur-lg border-b border-slate-200 px-6 py-4 rounded-t-3xl z-10">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900">ค้นหาบุคลากร</h2>
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
+        <div className="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">ค้นหาบุคลากร</h2>
+            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg"><X className="w-5 h-5" /></button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full p-2 border rounded" placeholder="ค้นหาชื่อ, ตำแหน่ง, สังกัด..." />
+            <select value={filterAff} onChange={(e) => setFilterAff(e.target.value)} className="p-2 border rounded">
+              <option value="">ทั้งหมด (สังกัด)</option>
+              {affiliations.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={filterPos} onChange={(e) => setFilterPos(e.target.value)} className="p-2 border rounded">
+              <option value="">ทั้งหมด (ตำแหน่ง)</option>
+              {positions.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm text-slate-500">พบ {results.length} รายการ</div>
+            <div className="flex items-center gap-2">
+              <button onClick={clearFilters} className="text-sm text-slate-600 px-2 py-1 rounded bg-slate-50">ล้าง</button>
+              <button onClick={() => onExport(results)} className="text-sm px-3 py-1 bg-indigo-600 text-white rounded">ส่งออก</button>
             </div>
           </div>
 
-          <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="ค้นหาด้วยชื่อ, ตำแหน่ง, สังกัด, รุ่น..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearchClick(); }} // Allow Enter key to search
-                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                   {/* New Search Button */}
-                   <button 
-                     onClick={handleSearchClick} 
-                     className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
-                   >
-                     <Search className="w-4 h-4" />
-                     <span>ค้นหา</span>
-                   </button>
-                   <button 
-                     onClick={() => onExport(filteredPersonnel)} 
-                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-50"
-                     disabled={!hasSearched || filteredPersonnel.length === 0}
-                   >
-                     <Download className="w-4 h-4" />
-                     <span>Export ({hasSearched ? filteredPersonnel.length : 0})</span>
-                   </button>
-                   <button 
-                     onClick={() => setShowFilters(!showFilters)} 
-                     className={`flex items-center space-x-2 px-4 py-2 border rounded-xl ${showFilters ? 'bg-indigo-50 border-indigo-200' : 'border-slate-200'}`}
-                   >
-                     <Filter className="w-4 h-4" />
-                     <span>ตัวกรอง</span>
-                   </button>
-                </div>
-              </div>
-               {hasSearched && ( // Only show results count and clear button after a search
-                <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
-                    <span>แสดง {filteredPersonnel.length} จาก {personnelData.length} คน</span>
-                    <button onClick={clearAllFilters} className="text-indigo-600 hover:text-indigo-800 font-medium">ล้างการค้นหา</button>
-                </div>
-               )}
-            </div>
-
-            <FilterPanel
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              stats={stats}
-              personnelData={personnelData}
-              isOpen={showFilters}
-              onToggle={() => setShowFilters(false)}
-            />
-
-            {/* --- MODIFIED RESULTS SECTION --- */}
-            {!hasSearched ? (
-                // Initial state before any search
-                <div className="text-center py-16">
-                    <Search className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900">เริ่มการค้นหา</h3>
-                    <p className="text-slate-600">ใช้แถบค้นหาหรือตัวกรองเพื่อแสดงข้อมูลบุคลากร</p>
-                </div>
-            ) : filteredPersonnel.length === 0 ? (
-                // State when search is done but no results are found
-                 <div className="text-center py-16">
-                    <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-900">ไม่พบข้อมูล</h3>
-                    <p className="text-slate-600">ลองปรับเปลี่ยนคำค้นหาหรือตัวกรองของคุณ</p>
-                </div>
-            ) : (
-                <div className="animate-fade-in-up">
-                    {/* Updated Grid Layout: 3 columns on large screens */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredPersonnel.map((person, index) => (
-                            <PersonnelCard
-                                key={`${person.phone}-${index}`}
-                                person={person}
-                                onView={onViewPerson}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
+          <div className="space-y-3 max-h-72 overflow-y-auto">
+            {results.map((p, i) => (
+              <PersonCard key={`${p.phone || i}-${i}`} person={p} onView={onViewPerson} onCall={handleCall} onMail={handleMail} />
+            ))}
+            {results.length === 0 && <div className="text-center text-slate-500 py-8">ไม่พบผลลัพธ์ที่ตรงกับคำค้น</div>}
           </div>
         </div>
       </div>
-      {/* --- Added Style for Animation --- */}
-      <style>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in-up {
-          animation: fadeInUp 0.5s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 });
 
-// Main PersonnelPage Component
-// Main PersonnelPage Component
 export default function PersonnelPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1033,44 +695,56 @@ export default function PersonnelPage({ user }) {
   const [showDetail, setShowDetail] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
 
+  const [quota, setQuota] = useState(100);
+  const [vacancy, setVacancy] = useState(20);
+  const [isEditingQuota, setIsEditingQuota] = useState(false);
+  const [isEditingVacancy, setIsEditingVacancy] = useState(false);
+
+  const [selectedChart, setSelectedChart] = useState("position"); // Default chart type
+  const [filters, setFilters] = useState({
+    affiliation: "",
+    department: "",
+    ageRange: "",
+    gender: "",
+  });
+
   const logAdminActivity = useCallback((action, details) => {
     if (!user) return;
     fetch(CONFIG.ADMIN_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'log_activity', log_action: action, log_details: details || null,
-        user_id: user.id, username: user.username,
-      })
-    }).catch(error => console.error('Failed to log activity:', error));
+        action: 'log_activity',
+        log_action: action,
+        log_details: details || null,
+        user_id: user.id,
+        username: user.username,
+      }),
+    }).catch((error) => console.error('Failed to log activity:', error));
   }, [user]);
 
   const fetchPersonnelData = useCallback(async () => {
     try {
       const apiUrl = CONFIG.OFFICERS_API;
-      const response = await fetch(apiUrl.toString());
+      const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-     // Check if the response body is empty
       const text = await response.text();
       if (!text) throw new Error('Empty response from server');
-
       const result = JSON.parse(text);
-      let data = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
-      
-      const formattedData = data.map(person => ({
+      const data = result.success && Array.isArray(result.data) ? result.data : [];
+      const formattedData = data.map((person) => ({
         phone: person.phone || '',
         prefix: person.prefix || '',
         firstname: person.firstname || '',
         lastname: person.lastname || '',
         position: person.position || '',
-        affiliation: person.affiliation || '', 
-        deph: person.department || '', 
+        affiliation: person.affiliation || '',
+        deph: person.department || '',
         generation: person.generation || '',
         email: person.email || '',
         dob: person.dob || '',
         lineUserId: person.lineUserId || '',
-        role: person.role || 'member' 
+        role: person.role || 'member',
       }));
       setPersonnelData(formattedData);
       setError("");
@@ -1078,161 +752,342 @@ export default function PersonnelPage({ user }) {
       setError(`⚠️ ${error.message}`);
       setPersonnelData([]);
     }
-  }, [user, CONFIG.OFFICERS_API]);
+  }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchPersonnelData();
-      setLoading(false);
-    };
-    loadData();
+    fetchPersonnelData();
   }, [fetchPersonnelData]);
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = () => {
     setRefreshing(true);
-    await fetchPersonnelData();
-    setRefreshing(false);
-  }, [fetchPersonnelData]);
+    fetchPersonnelData().finally(() => setRefreshing(false));
+  };
+
+  const handleViewPerson = (person) => {
+  // If user opened from search, close search modal first so detail appears on top
+  setShowSearchModal(false);
+  setSelectedPerson(person);
+  setShowDetail(true);
+  };
+
+  const exportToCSV = (data) => {
+    // Implement CSV export logic here
+  };
+
+  const affiliationAbbreviations = {
+    "ศูนย์รักษาความปลอดภัย": "ส่วนกลาง",
+    "ศาลชั้นต้นในกรุงเทพมหานคร": "กทม.",
+  };
+
+  const filteredAffiliationData = useMemo(() => {
+    return personnelData.reduce((acc, person) => {
+      let affiliation = (person.affiliation || '').trim();
+      if (!affiliation) affiliation = 'ไม่ระบุ';
+
+      const lower = affiliation.toLowerCase();
+
+      // Normalize known patterns using targeted rules
+      let normalized = affiliation;
+
+      // If it's the regional office pattern that contains สำนักศาลยุติธรรมประจำภาค
+      // we want to convert it to: 'ภาค <n>' when a number exists, otherwise 'ภาค'
+      if (
+        lower.includes('สำนักศาลยุติธรรมประจำภาค') ||
+        lower.includes('สำนักยุติธรรมประจำภาค') ||
+        lower.includes('ในสังกัดสำนักศาลยุติธรรมประจำภาค') ||
+        lower.includes('ศาลในสังกัดสำนักศาลยุติธรรมประจำภาค')
+      ) {
+        // Try to extract explicit 'ภาค <number>' first
+        const matchRegion = affiliation.match(/ภาค\s*(\d{1,3})/i);
+        if (matchRegion && matchRegion[1]) {
+          normalized = `ภาค ${matchRegion[1]}`;
+        } else {
+          // Fallback: find any trailing number in the string (e.g., '... ประจำภาค 4')
+          const trailingNum = affiliation.match(/(\d{1,3})\s*$/);
+          if (trailingNum && trailingNum[1]) {
+            normalized = `ภาค ${trailingNum[1]}`;
+          } else {
+            // Last-resort: any first number in the string
+            const anyNum = affiliation.match(/(\d{1,3})/);
+            normalized = anyNum && anyNum[1] ? `ภาค ${anyNum[1]}` : 'ภาค';
+          }
+        }
+      } else if (lower.includes('ศูนย์รักษาความปลอดภัย')) {
+        normalized = 'ส่วนกลาง';
+      } else if (lower.includes('กรุงเทพ') || lower.includes('กรุงเทพมหานคร') || lower.includes('ศาลชั้นต้นในกรุงเทพมหานคร')) {
+        normalized = 'กทม.';
+      } else {
+        // fallback to any exact mapping we defined, otherwise keep original
+        normalized = affiliationAbbreviations[affiliation] || affiliation;
+      }
+
+      acc[normalized] = (acc[normalized] || 0) + 1;
+      return acc;
+    }, {});
+  }, [personnelData]);
+
+  const chartData = useMemo(() => {
+    const entries = Object.entries(filteredAffiliationData).map(([label, value]) => ({ label, value }));
+
+    const getOrderKey = (label) => {
+      if (!label) return 9999;
+      const l = String(label).trim();
+
+      // Match 'ภาค' followed by number e.g. 'ภาค 1' or 'ภาค1'
+      const m = l.match(/ภาค\s*(\d{1,3})/);
+      if (m && m[1]) {
+        // Put ภาค N in order 0.. (keep N small)
+        const num = parseInt(m[1], 10);
+        return num; // 1..9 -> 1..9 (smaller is earlier)
+      }
+
+      // If label is exactly 'ภาค' (no number), put after numbered ภาค
+      if (/^ภาค$/i.test(l)) return 999;
+
+      // Specific named orders after ภาค group
+      if (l === 'กทม.' || l.toLowerCase() === 'กทม.') return 1000;
+      if (l === 'ส่วนกลาง' || l.toLowerCase() === 'ส่วนกลาง') return 1001;
+      if (l.includes('ศาลสูง')) return 1002;
+      // handle both spellings 'ชำนาญ' and 'ชำนัญ'
+      if (l.includes('ชำนาญ') || l.includes('ชำนัญ') || l.includes('ชำนัญพิเศษ') || l.includes('ชำนาญพิเศษ')) return 1003;
+
+      // Default: place after known groups but preserve alphabetical order by returning a high key plus name
+      return 5000 + l.charCodeAt(0);
+    };
+
+    entries.sort((a, b) => {
+      const ka = getOrderKey(a.label);
+      const kb = getOrderKey(b.label);
+      if (ka === kb) {
+        // fallback alphabetical
+        return String(a.label).localeCompare(String(b.label));
+      }
+      return ka - kb;
+    });
+
+    return entries;
+  }, [filteredAffiliationData]);
 
   const stats = useMemo(() => {
     const newStats = {
       total: personnelData.length,
-      connected: personnelData.filter(p => p.lineUserId).length,
-      byPosition: {}, byAffiliation: {}, byDepartment: {}, byGeneration: {},
+      connected: personnelData.filter((p) => p.lineUserId).length,
+      byPosition: {},
+      byAffiliation: {},
+      byDepartment: {},
+      byGeneration: {},
     };
-    personnelData.forEach(person => {
+    personnelData.forEach((person) => {
       const position = person.position || 'ไม่ระบุ';
       newStats.byPosition[position] = (newStats.byPosition[position] || 0) + 1;
       const affiliation = person.affiliation || 'ไม่ระบุ';
       newStats.byAffiliation[affiliation] = (newStats.byAffiliation[affiliation] || 0) + 1;
-      const department = person.deph || 'ไม่ระบุ';
+      const department = person.deph || 'ไม่ระบุตำแหน่ง';
       newStats.byDepartment[department] = (newStats.byDepartment[department] || 0) + 1;
-      const generation = person.generation ? String(person.generation).trim() : 'ไม่ระบุ';
+      const generation = person.generation ? String(person.generation).trim() : 'ไม่ระบุตำแหน่ง';
       newStats.byGeneration[generation] = (newStats.byGeneration[generation] || 0) + 1;
     });
     return newStats;
   }, [personnelData]);
-  
-  const chartData = useMemo(() => {
-    const positionChartData = Object.entries(stats.byPosition)
-      .sort(([, a], [, b]) => b - a).slice(0, 8)
-      .map(([label, value]) => ({ label: truncatePosition(label) || label, value }));
 
-    const getRegionNumber = (affiliationString) => {
-        const match = affiliationString.match(/ภาค\s*(\d+)/);
-        return match ? parseInt(match[1]) : null;
-    };
-    const affiliationChartData = Object.entries(stats.byAffiliation)
-      .filter(([label]) => label !== 'ไม่ระบุ' && label.trim() !== '')
-      .sort(([affA], [affB]) => {
-          const numA = getRegionNumber(affA);
-          const numB = getRegionNumber(affB);
-          if (numA !== null && numB !== null) return numA - numB;
-          if (numA !== null) return -1;
-          if (numB !== null) return 1;
-          return (stats.byAffiliation[affB] || 0) - (stats.byAffiliation[affA] || 0);
-      })
-      .map(([label, value]) => ({ label, value }));
+  useEffect(() => {
+    console.log("Personnel Data:", personnelData);
+  }, [personnelData]);
 
-    const generationChartData = Object.entries(stats.byGeneration)
-      .filter(([gen]) => gen !== 'ไม่ระบุ' && gen.trim() !== '')
-      .sort(([a], [b]) => (parseInt(a) || 0) - (parseInt(b) || 0)).slice(0, 10)
-      .map(([label, value]) => ({ label: `รุ่น ${label}`, value }));
+  useEffect(() => {
+    console.log("Stats:", stats);
+    console.log("Chart Data:", chartData);
+  }, [stats, chartData]);
 
-    return { positionChartData, affiliationChartData, generationChartData };
-  }, [stats]);
+  const chartColors = [
+    "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#FFCD56", "#C9CBCF"
+  ];
 
-  const chartColors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#f97316', '#84cc16', '#ec4899', '#14b8a6'];
-  
-  const handleViewPerson = useCallback((person) => {
-    logAdminActivity('view_personnel_detail', { person_name: `${person.firstname}`, phone: person.phone });
-    setSelectedPerson(person);
-    setShowDetail(true);
-    setShowSearchModal(false);
-  }, [logAdminActivity]);
+  // Helper: build chart data for different types (inside component)
+  const getChartData = useCallback((type) => {
+    if (type === 'affiliation') return chartData; // already normalized affiliation entries
 
-  const exportToCSV = useCallback((dataToExport) => {
-    logAdminActivity('export_personnel_csv', { record_count: dataToExport.length });
-    if (dataToExport.length === 0) {
-      alert('ไม่มีข้อมูลสำหรับ Export');
-      return;
+    if (type === 'position') {
+      // build from stats.byPosition
+      const entries = Object.entries(stats.byPosition || {}).map(([label, value]) => ({ label, value }));
+      // sort by value desc
+      entries.sort((a, b) => b.value - a.value);
+      return entries;
     }
-    const headers = [ 'คำนำหน้า', 'ชื่อ', 'นามสกุล', 'ตำแหน่ง', 'สังกัด', 'แผนก', 'รุ่น', 'เบอร์โทรศัพท์', 'อีเมล', 'วันเกิด'];
-    const rows = dataToExport.map(p => [ p.prefix, p.firstname, p.lastname, p.position, p.affiliation, p.deph, p.generation, p.phone, p.email, p.dob ]);
-    const csvContent = [headers, ...rows].map(row => row.map(field => `"${String(field || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `บุคลากร_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-  }, [logAdminActivity]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-600 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-slate-600 font-medium">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
-  }
+    if (type === 'age') {
+      // derive age groups from dob (basic)
+      const groups = { '<30': 0, '30-39': 0, '40-49': 0, '50-59': 0, '60+': 0 };
+      const now = new Date();
+      personnelData.forEach(p => {
+        if (!p.dob) return;
+        const m = String(p.dob).match(/(\d{4})/);
+        if (!m) return;
+        const year = parseInt(m[1], 10);
+        if (isNaN(year)) return;
+        const age = now.getFullYear() - year;
+        if (age < 30) groups['<30']++;
+        else if (age < 40) groups['30-39']++;
+        else if (age < 50) groups['40-49']++;
+        else if (age < 60) groups['50-59']++;
+        else groups['60+']++;
+      });
+      return Object.entries(groups).map(([label, value]) => ({ label, value }));
+    }
+
+    if (type === 'gender') {
+      // no gender field in data - return empty to show no data
+      const genders = (personnelData || []).reduce((acc, p) => {
+        const g = (p.gender || '').trim();
+        if (!g) return acc;
+        acc[g] = (acc[g] || 0) + 1;
+        return acc;
+      }, {});
+      return Object.entries(genders).map(([label, value]) => ({ label, value }));
+    }
+
+    return [];
+  }, [chartData, stats, personnelData]);
+
+  const renderChart = () => {
+    switch (selectedChart) {
+      case "position":
+        return (
+          <HorizontalBarChart
+            data={getChartData('position')}
+            colors={chartColors}
+            title="ตำแหน่ง"
+            maxHeight="320px"
+          />
+        );
+      case "affiliation":
+        return (
+          <HorizontalBarChart
+            data={getChartData('affiliation')}
+            colors={chartColors}
+            title="สัดส่วนแต่ละสังกัด"
+            maxHeight="320px"
+          />
+        );
+      case "gender":
+        return (
+          <PieChartComponent
+            data={getChartData('gender')}
+            colors={chartColors}
+            title="เพศ"
+          />
+        );
+      case "age":
+        return (
+          <HorizontalBarChart
+            data={getChartData('age')}
+            colors={chartColors}
+            title="ช่วงอายุ"
+            maxHeight="240px"
+          />
+        );
+      default:
+        return <p>ไม่มีข้อมูลสำหรับแสดงผล</p>;
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div></div>
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">ข้อมูลบุคลากร</h1>
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
+            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow"
           >
             <Search className="w-4 h-4" />
             <span>ค้นหาบุคลากร</span>
           </button>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl disabled:opacity-50"
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="border rounded-2xl p-4 flex items-start space-x-3 bg-red-50 border-red-200">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
-          <div>
-            <p className="font-medium text-red-800">เกิดข้อผิดพลาด</p>
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard title="บุคลากรทั้งหมด" value={stats.total} icon={Users} color="blue" subtitle="ทั้งหมดในระบบ" />
-        <StatCard title="จำนวนรุ่น" value={Object.keys(stats.byGeneration).filter(g => g !== 'ไม่ระบุ').length} icon={GraduationCap} color="purple" subtitle="รุ่นที่แตกต่าง" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <EditableCard
+          title="กรอบอัตรา"
+          value={quota}
+          icon={Briefcase}
+          color="blue"
+          isEditing={isEditingQuota}
+          onEdit={() => setIsEditingQuota(!isEditingQuota)}
+          onChange={(value) => setQuota(value)}
+          isAdmin={user?.role === 'admin'}
+        />
+        <EditableCard
+          title="ตำแหน่งว่าง"
+          value={vacancy}
+          icon={UserX}
+          color="red"
+          isEditing={isEditingVacancy}
+          onEdit={() => setIsEditingVacancy(!isEditingVacancy)}
+          onChange={(value) => setVacancy(value)}
+          isAdmin={user?.role === 'admin'}
+        />
+        <StatCard
+          title="บุคลากรทั้งหมด"
+          value={stats.total}
+          icon={Users}
+          color="green"
+          subtitle="ทั้งหมดในระบบ"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <div className="space-y-6 lg:col-span-1">
-          <HorizontalBarChart title="เจ้าพนักงานตำรวจศาลแต่ละตำแหน่ง" data={chartData.positionChartData} colors={chartColors} />
-          <BarChart title="เจ้าพนักงานตำรวจศาลแต่ละรุ่น" data={chartData.generationChartData} colors={chartColors} />
+      <div className="flex items-center space-x-4 mb-6">
+        <button
+          onClick={() => setSelectedChart("position")}
+          className={`px-4 py-2 rounded-lg ${selectedChart === "position" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+        >
+          ตำแหน่ง
+        </button>
+        <button
+          onClick={() => setSelectedChart("affiliation")}
+          className={`px-4 py-2 rounded-lg ${selectedChart === "affiliation" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+        >
+          สังกัด
+        </button>
+        <button
+          onClick={() => setSelectedChart("gender")}
+          className={`px-4 py-2 rounded-lg ${selectedChart === "gender" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+        >
+          เพศ
+        </button>
+        <button
+          onClick={() => setSelectedChart("age")}
+          className={`px-4 py-2 rounded-lg ${selectedChart === "age" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+        >
+          ช่วงอายุ
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟแท่ง</h2>
+          <HorizontalBarChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" maxHeight="500px" />
         </div>
-        <div className="lg:col-span-2">
-          <TreemapChart title="เจ้าพนักงานตำรวจศาลแบ่งตามภาค" data={chartData.affiliationChartData} colors={chartColors} />
+        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟวงกลม</h2>
+          <PieChartComponent data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
+        </div>
+        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟโดนัท</h2>
+          <DonutChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
+        </div>
+        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟเส้น</h2>
+          <LineChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
         </div>
       </div>
-      
+
       <PersonnelDetailModal
         person={selectedPerson}
         isOpen={showDetail}
         onClose={() => setShowDetail(false)}
       />
-      
-      <SearchModal 
+      <SearchModal
         isOpen={showSearchModal}
         onClose={() => setShowSearchModal(false)}
         personnelData={personnelData}
