@@ -19,7 +19,12 @@ import {
   File,
   Shield,
   CloudSun,
-  Target
+  Target,
+  UserPlus,
+  Star,
+  Crown,
+  User,
+  ChevronDown
 } from 'lucide-react';
 import { CONFIG } from '../config';
 
@@ -900,6 +905,309 @@ const ShiftWorkPage = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Unit Management View Component - เลือกการ์ดส่วนงานแล้วจัดการบุคลากร
+const UnitManagementView = ({
+  dutyUnits,
+  unitStructures,
+  onEdit,
+  onDelete,
+  onAdd,
+  onEditDutyUnit,
+  onDeleteDutyUnit,
+  onAddDutyUnit,
+  getRoleIcon,
+  getRoleLabel,
+  getRoleBadgeClass
+}) => {
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
+  const [personnelAction, setPersonnelAction] = useState(''); // 'add', 'setSupervisor'
+
+  // Get unit statistics
+  const getUnitStats = (unitCode) => {
+    const unitPersonnel = unitStructures.filter(item => item.unit_code === unitCode);
+    const supervisor = unitPersonnel.find(item => item.role === 'supervisor');
+    const members = unitPersonnel.filter(item => item.role === 'member');
+    const director = unitPersonnel.find(item => item.role === 'director');
+    
+    return {
+      total: unitPersonnel.length,
+      supervisor,
+      members,
+      director,
+      hasSupervisor: !!supervisor,
+      hasDirector: !!director
+    };
+  };
+
+  const handleUnitSelect = (unit) => {
+    setSelectedUnit(unit);
+  };
+
+  const handleAddPersonnel = () => {
+    if (!selectedUnit) return;
+    
+    const stats = getUnitStats(selectedUnit.unit_code);
+    const nextSeniorityOrder = stats.total + 1;
+    
+    // เปิด modal พร้อมกำหนดค่าเริ่มต้น
+    onAdd({
+      unit_code: selectedUnit.unit_code,
+      role: selectedUnit.unit_code === 'CS08' ? 'director' : 'member',
+      seniority_order: nextSeniorityOrder
+    });
+  };
+
+  const handleSetSupervisor = () => {
+    if (!selectedUnit) return;
+    
+    // เปิด modal สำหรับกำหนดหัวหน้าส่วน
+    onAdd({
+      unit_code: selectedUnit.unit_code,
+      role: 'supervisor',
+      seniority_order: 1
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Unit Cards */}
+      <div className="lg:col-span-2">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">เลือกส่วนงาน</h2>
+          <button
+            onClick={() => onAddDutyUnit()}
+            className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            เพิ่มส่วนงาน
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {dutyUnits.map((unit) => {
+            const stats = getUnitStats(unit.unit_code);
+            const isSelected = selectedUnit?.unit_code === unit.unit_code;
+            const isDirector = unit.unit_code === 'CS08';
+            
+            return (
+              <div
+                key={unit.unit_code}
+                onClick={() => handleUnitSelect(unit)}
+                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  isSelected 
+                    ? 'border-indigo-500 bg-indigo-50' 
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {/* Unit Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">{unit.unit_code.toUpperCase()}</h3>
+                    <p className="text-sm text-slate-600">{unit.unit_name}</p>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditDutyUnit(unit);
+                      }}
+                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    {!isDirector && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDutyUnit(unit);
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Unit Status */}
+                <div className="space-y-2 mb-3">
+                  {isDirector ? (
+                    <div className="flex items-center space-x-2">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      <span className="text-sm text-slate-600">ผู้อำนวยการศูนย์</span>
+                      {stats.hasDirector && (
+                        <span className="text-sm text-green-600 font-medium">
+                          (มีแล้ว)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm text-slate-600">หัวหน้าส่วน:</span>
+                      {stats.hasSupervisor ? (
+                        <span className="text-sm text-green-600 font-medium">
+                          {stats.supervisor?.full_name}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-red-500">ยังไม่กำหนด</span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm text-slate-600">
+                      บุคลากร: {stats.total} คน
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="pt-2 border-t border-slate-200">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">คลิกเพื่อจัดการ</span>
+                    {isSelected && (
+                      <span className="text-indigo-600 font-medium">เลือกแล้ว</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected Unit Management Panel */}
+      <div className="lg:col-span-1">
+        {selectedUnit ? (
+          <div className="bg-slate-50 rounded-lg p-4">
+            <h3 className="font-semibold text-slate-800 mb-4">
+              จัดการ {selectedUnit.unit_code.toUpperCase()}
+            </h3>
+            
+            <div className="space-y-3">
+              {selectedUnit.unit_code === 'CS08' ? (
+                // Director Unit (CS08) - สามารถมีได้เพียง 1 คน
+                <>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Star className="w-4 h-4 text-yellow-600" />
+                      <span className="text-sm font-medium text-yellow-800">ผู้อำนวยการศูนย์</span>
+                    </div>
+                    <p className="text-xs text-yellow-700">
+                      หน่วยงานนี้สามารถมีได้เพียง 1 คนเท่านั้น
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={handleAddPersonnel}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>กำหนดผู้อำนวยการ</span>
+                  </button>
+                </>
+              ) : (
+                // Regular Units - สามารถมีได้หลายคน
+                <>
+                  <button
+                    onClick={handleSetSupervisor}
+                    disabled={getUnitStats(selectedUnit.unit_code).hasSupervisor}
+                    className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg ${
+                      getUnitStats(selectedUnit.unit_code).hasSupervisor
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>
+                      {getUnitStats(selectedUnit.unit_code).hasSupervisor 
+                        ? 'มีหัวหน้าส่วนแล้ว' 
+                        : 'กำหนดหัวหน้าส่วน'
+                      }
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={handleAddPersonnel}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>เพิ่มเจ้าหน้าที่</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Current Personnel */}
+            <div className="mt-6">
+              <h4 className="text-sm font-medium text-slate-700 mb-3">บุคลากรปัจจุบัน</h4>
+              <div className="space-y-2">
+                {unitStructures
+                  .filter(item => item.unit_code === selectedUnit.unit_code)
+                  .sort((a, b) => {
+                    // เรียงลำดับ: director > supervisor > member
+                    if (a.role === 'director') return -1;
+                    if (b.role === 'director') return 1;
+                    if (a.role === 'supervisor') return -1;
+                    if (b.role === 'supervisor') return 1;
+                    return a.seniority_order - b.seniority_order;
+                  })
+                  .map((person) => (
+                    <div key={person.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                      <div className="flex items-center space-x-2">
+                        {getRoleIcon(person.role)}
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">
+                            {person.full_name || `ตำแหน่งที่ ${person.position_number}`}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {getRoleLabel(person.role)} • ลำดับ {person.seniority_order}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => onEdit(person)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(person)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                
+                {unitStructures.filter(item => item.unit_code === selectedUnit.unit_code).length === 0 && (
+                  <div className="text-center py-4 text-slate-500">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">ยังไม่มีบุคลากร</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-50 rounded-lg p-8 text-center">
+            <Building className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+            <h3 className="text-lg font-medium text-slate-600 mb-2">เลือกส่วนงาน</h3>
+            <p className="text-sm text-slate-500">
+              เลือกส่วนงานจากรายการด้านซ้ายเพื่อจัดการบุคลากร
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

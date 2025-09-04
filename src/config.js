@@ -15,8 +15,11 @@ export const CONFIG = {
   UNITS_API: `${API_BASE_URL}/api/units`,
   SCHEDULES_API: `${API_BASE_URL}/api/schedules`,
   LOGS_API: `${API_BASE_URL}/api/logs`,
-  // Redirect URI
+  ADMIN_API: `${API_BASE_URL}/api/admin`,
+  AUTH_API: `${API_BASE_URL}/api/auth`,
+  UNIT_STRUCTURE_API: `${API_BASE_URL}/api/unit_structure`,
   
+  // Redirect URI
   REDIRECT_URI: isDevelopment
     ? (process.env.REACT_APP_LINE_REDIRECT_URI_DEV || "http://localhost:3000")
     : (process.env.REACT_APP_LINE_REDIRECT_URI_PROD || "https://courtmarshal.rf.gd"),

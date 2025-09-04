@@ -25,11 +25,25 @@ import {
   Briefcase,
   GraduationCap,
   Edit2,
-  Save
+  Save,
+  MapPin,
+  Building,
+  Crown,
+  FileText
 } from "lucide-react";
 import { CONFIG } from '../config';
 import DonutChart from '../components/DonutChart';
 import LineChart from '../components/LineChart';
+
+// Function to format phone number (add leading 0 if needed)
+const formatPhoneNumber = (phone) => {
+  if (!phone) return '';
+  const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+  if (cleanPhone.length === 9) {
+    return '0' + cleanPhone; // Add leading 0 for 9-digit numbers
+  }
+  return cleanPhone; // Return as-is for other lengths
+};
 
 
 
@@ -529,44 +543,145 @@ const EditableCard = memo(({ title, value, icon: Icon, color = "blue", isEditing
 // PersonnelDetailModal (minimal)
 const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
   if (!isOpen || !person) return null;
+
+  // Calculate age from birth date
+  const calculateAge = (dob) => {
+    if (!dob) return 'ไม่ระบุ';
+    try {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      return `${age} ปี`;
+    } catch (error) {
+      return 'ไม่ระบุ';
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-60 overflow-y-auto bg-black/40">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-xl font-bold text-slate-600">{(person.firstname||'').charAt(0)}{(person.lastname||'').charAt(0)}</div>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 hide-scrollbar">
+      <div className="flex min-h-screen items-start justify-center p-3 sm:p-6 md:p-10">
+        <div className="relative bg-gradient-to-br from-white via-slate-50 to-indigo-50 rounded-2xl sm:rounded-3xl shadow-2xl max-w-3xl w-full p-4 sm:p-6">
+          {/* Header with game-card style */}
+          <div className="flex items-start justify-between mb-6 pb-4 border-b border-slate-200">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg sm:text-xl font-bold shadow-lg">
+                {(person.firstname || 'N')[0]}
+              </div>
               <div>
-                <div className="text-lg font-semibold">{person.prefix} {person.firstname} {person.lastname}</div>
-                <div className="text-sm text-slate-500">{person.position || '-'} • {person.affiliation || '-'}</div>
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                  {person.prefix} {person.firstname} {person.lastname}
+                </h2>
+                <p className="text-sm text-slate-600">{person.position || 'ไม่ระบุตำแหน่ง'}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              {person.phone && (
-                <a href={`tel:${person.phone}`} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded text-sm" title="โทร">
-                  <Phone className="w-4 h-4 text-slate-600" />
-                  <span>โทร</span>
-                </a>
-              )}
-              {person.email && (
-                <a href={`mailto:${person.email}`} className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded text-sm" title="อีเมล">
-                  <Mail className="w-4 h-4 text-slate-600" />
-                  <span>อีเมล</span>
-                </a>
-              )}
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg" aria-label="ปิด">
-                <X className="w-5 h-5" />
-              </button>
+            <button 
+              onClick={onClose} 
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white/80 rounded-lg transition-all duration-200"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            {/* Contact Information Card */}
+            <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl p-4 sm:p-5 shadow-lg border border-slate-200/50">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <Phone className="w-5 h-5 text-blue-600" />
+                ข้อมูลติดต่อ
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
+                  <Phone className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm text-slate-700">{formatPhoneNumber(person.phone) || 'ไม่ระบุ'}</span>
+                </div>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
+                  <Mail className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm text-slate-700">{person.email || 'ไม่ระบุ'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Work Information Card */}
+            <div className="bg-gradient-to-br from-white to-green-50 rounded-xl p-4 sm:p-5 shadow-lg border border-slate-200/50">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <Building className="w-5 h-5 text-green-600" />
+                ข้อมูลการทำงาน
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <div className="text-sm">
+                    <div className="font-medium text-slate-700">สังกัด</div>
+                    <div className="text-slate-600">{person.affiliation || 'ไม่ระบุ'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
+                  <Users className="w-4 h-4 text-slate-500" />
+                  <div className="text-sm">
+                    <div className="font-medium text-slate-700">หน่วยงาน</div>
+                    <div className="text-slate-600">{person.deph || 'ไม่ระบุ'}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
+                  <Crown className="w-4 h-4 text-slate-500" />
+                  <div className="text-sm">
+                    <div className="font-medium text-slate-700">ตำแหน่ง</div>
+                    <div className="text-slate-600">{person.position || 'ไม่ระบุ'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Information Card */}
+            <div className="lg:col-span-2 bg-gradient-to-br from-white to-purple-50 rounded-xl p-4 sm:p-5 shadow-lg border border-slate-200/50">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-600" />
+                ข้อมูลเพิ่มเติม
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-slate-700">อายุ</div>
+                  <div className="text-sm text-slate-600 p-2 bg-white/70 rounded-lg">
+                    {calculateAge(person.dob)}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            <div><strong>หน่วยงาน:</strong> {person.deph || '-'}</div>
-            <div><strong>เบอร์โทรศัพท์:</strong> {person.phone || '-'}</div>
-            <div><strong>อีเมล:</strong> {person.email || '-'}</div>
-            <div><strong>วันเกิด:</strong> {person.dob || '-'}</div>
-            <div><strong>Line ID:</strong> {person.lineUserId || '-'}</div>
-            <div><strong>บทบาท:</strong> {person.role || '-'}</div>
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-slate-200">
+            {person.phone && (
+              <button 
+                onClick={() => window.open(`tel:${formatPhoneNumber(person.phone)}`, '_self')} 
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                <Phone className="w-4 h-4" />
+                <span className="text-sm font-medium">โทรหา</span>
+              </button>
+            )}
+            {person.email && (
+              <button 
+                onClick={() => window.open(`mailto:${person.email}`, '_self')} 
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                <Mail className="w-4 h-4" />
+                <span className="text-sm font-medium">ส่งอีเมล</span>
+              </button>
+            )}
+            <button 
+              onClick={onClose} 
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 text-white rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 sm:ml-auto"
+            >
+              <span className="text-sm font-medium">ปิด</span>
+            </button>
           </div>
         </div>
       </div>
@@ -574,40 +689,66 @@ const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
   );
 });
 
-// SearchModal (minimal placeholder)
-// Small visual card for a person used in search results (minimal + icon)
+// SearchModal (enhanced with department filtering and game-card style)
+// Small visual card for a person used in search results (game-card style)
 const PersonCard = memo(({ person, onView, onCall, onMail }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-lg">
-          {(person.firstname||'').charAt(0)}{(person.lastname||'').charAt(0)}
+    <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-100 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 border border-indigo-200 hover:border-indigo-300 transform hover:scale-105">
+      {/* Header with name and position */}
+      <div className="mb-4">
+        <div className="text-sm sm:text-base font-bold text-slate-900 mb-1">
+          {person.prefix} {person.firstname} {person.lastname}
         </div>
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-slate-900 truncate">{person.prefix} {person.firstname} {person.lastname}</div>
-          <div className="text-xs text-slate-500 truncate flex items-center gap-2">
-            <Building2 className="w-3 h-3 text-slate-400" />
-            <span>{person.affiliation || '-'}</span>
-            <span className="mx-1">•</span>
-            <span>{person.position || '-'}</span>
-          </div>
+        <div className="text-xs sm:text-sm text-indigo-600 font-medium">
+          {person.position || 'ไม่ระบุตำแหน่ง'}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {person.phone && (
-          <button onClick={() => onCall(person.phone)} className="p-2 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600" title="โทร">
-            <Phone className="w-4 h-4" />
-          </button>
-        )}
-        {person.email && (
-          <button onClick={() => onMail(person.email)} className="p-2 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600" title="อีเมล">
-            <Mail className="w-4 h-4" />
-          </button>
-        )}
-        <button onClick={() => onView(person)} className="px-3 py-1 bg-indigo-600 text-white rounded-md text-sm flex items-center gap-2">
-          <Eye className="w-4 h-4" /> ดู
+      {/* Info section */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+          <Building2 className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+          <span className="truncate">{person.affiliation || 'ไม่ระบุสังกัด'}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+          <Briefcase className="w-4 h-4 text-purple-500 flex-shrink-0" />
+          <span className="truncate">{person.deph || 'ไม่ระบุหน่วยงาน'}</span>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="space-y-2">
+        <button 
+          onClick={() => onView(person)} 
+          className="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg"
+        >
+          <Eye className="w-4 h-4" /> 
+          ดูรายละเอียด
         </button>
+        
+        {/* Contact buttons */}
+        <div className="flex items-center gap-2">
+          {person.phone && (
+            <button 
+              onClick={() => onCall(formatPhoneNumber(person.phone))} 
+              className="flex-1 p-2 rounded-xl bg-green-100 hover:bg-green-200 text-green-600 transition-colors shadow-sm flex items-center justify-center gap-1" 
+              title="โทร"
+            >
+              <Phone className="w-4 h-4" />
+              <span className="text-xs">โทร</span>
+            </button>
+          )}
+          {person.email && (
+            <button 
+              onClick={() => onMail(person.email)} 
+              className="flex-1 p-2 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors shadow-sm flex items-center justify-center gap-1" 
+              title="อีเมล"
+            >
+              <Mail className="w-4 h-4" />
+              <span className="text-xs">อีเมล</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -616,26 +757,48 @@ const PersonCard = memo(({ person, onView, onCall, onMail }) => {
 const SearchModal = memo(({ isOpen, onClose, personnelData = [], stats = {}, onViewPerson = () => {}, onExport = () => {}, user }) => {
   const [query, setQuery] = useState('');
   const [filterAff, setFilterAff] = useState('');
+  const [filterDept, setFilterDept] = useState('');
   const [filterPos, setFilterPos] = useState('');
 
+  // Get unique affiliations
   const affiliations = useMemo(() => {
     const setAff = new Set();
     personnelData.forEach(p => setAff.add(p.affiliation || 'ไม่ระบุ'));
     return Array.from(setAff).sort();
   }, [personnelData]);
 
+  // Get departments based on selected affiliation
+  const departments = useMemo(() => {
+    const relevantPersonnel = filterAff 
+      ? personnelData.filter(p => (p.affiliation || 'ไม่ระบุ') === filterAff)
+      : personnelData;
+    
+    const setDept = new Set();
+    relevantPersonnel.forEach(p => setDept.add(p.deph || 'ไม่ระบุ'));
+    return Array.from(setDept).sort();
+  }, [personnelData, filterAff]);
+
+  // Get positions
   const positions = useMemo(() => {
     const s = new Set();
     personnelData.forEach(p => s.add(p.position || 'ไม่ระบุ'));
     return Array.from(s).sort();
   }, [personnelData]);
 
+  // Reset department when affiliation changes
+  useEffect(() => {
+    if (filterAff) {
+      setFilterDept('');
+    }
+  }, [filterAff]);
+
   if (!isOpen) return null;
 
   const results = personnelData.filter(p => {
-    const hay = `${p.firstname} ${p.lastname} ${p.position || ''} ${p.affiliation || ''}`.toLowerCase();
-    if (!hay.includes(query.toLowerCase())) return false;
+    const hay = `${p.firstname} ${p.lastname} ${p.position || ''} ${p.affiliation || ''} ${p.deph || ''}`.toLowerCase();
+    if (query && !hay.includes(query.toLowerCase())) return false;
     if (filterAff && (p.affiliation || 'ไม่ระบุ') !== filterAff) return false;
+    if (filterDept && (p.deph || 'ไม่ระบุ') !== filterDept) return false;
     if (filterPos && (p.position || 'ไม่ระบุ') !== filterPos) return false;
     return true;
   });
@@ -643,42 +806,106 @@ const SearchModal = memo(({ isOpen, onClose, personnelData = [], stats = {}, onV
   const handleCall = (tel) => window.open(`tel:${tel}`, '_self');
   const handleMail = (email) => window.open(`mailto:${email}`, '_self');
 
-  const clearFilters = () => { setFilterAff(''); setFilterPos(''); setQuery(''); };
+  const clearFilters = () => { 
+    setFilterAff(''); 
+    setFilterDept(''); 
+    setFilterPos(''); 
+    setQuery(''); 
+  };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60">
-      <div className="flex min-h-screen items-start justify-center p-4 sm:p-6 md:p-10">
-        <div className="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">ค้นหาบุคลากร</h2>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 hide-scrollbar">
+      <div className="flex min-h-screen items-start justify-center p-3 sm:p-6 md:p-10">
+        <div className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-6xl w-full p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">🔍 ค้นหาบุคลากร</h2>
+            <button 
+              onClick={onClose} 
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full p-2 border rounded" placeholder="ค้นหาชื่อ, ตำแหน่ง, สังกัด..." />
-            <select value={filterAff} onChange={(e) => setFilterAff(e.target.value)} className="p-2 border rounded">
-              <option value="">ทั้งหมด (สังกัด)</option>
+          {/* Enhanced Search Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <input 
+              value={query} 
+              onChange={(e) => setQuery(e.target.value)} 
+              className="w-full p-2 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm" 
+              placeholder="🔍 ค้นหาชื่อ, ตำแหน่ง..." 
+            />
+            
+            <select 
+              value={filterAff} 
+              onChange={(e) => setFilterAff(e.target.value)} 
+              className="p-2 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+            >
+              <option value="">🏢 ทั้งหมด (สังกัด)</option>
               {affiliations.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
-            <select value={filterPos} onChange={(e) => setFilterPos(e.target.value)} className="p-2 border rounded">
-              <option value="">ทั้งหมด (ตำแหน่ง)</option>
+            
+            <select 
+              value={filterDept} 
+              onChange={(e) => setFilterDept(e.target.value)} 
+              className="p-2 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+              disabled={!filterAff}
+            >
+              <option value="">🏛️ ทั้งหมด (หน่วยงาน)</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            
+            <select 
+              value={filterPos} 
+              onChange={(e) => setFilterPos(e.target.value)} 
+              className="p-2 sm:p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+            >
+              <option value="">👤 ทั้งหมด (ตำแหน่ง)</option>
               {positions.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm text-slate-500">พบ {results.length} รายการ</div>
+          {/* Results header and actions */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+            <div className="text-sm text-slate-600 flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-500" />
+              พบ <span className="font-bold text-indigo-600">{results.length}</span> รายการ
+            </div>
             <div className="flex items-center gap-2">
-              <button onClick={clearFilters} className="text-sm text-slate-600 px-2 py-1 rounded bg-slate-50">ล้าง</button>
-              <button onClick={() => onExport(results)} className="text-sm px-3 py-1 bg-indigo-600 text-white rounded">ส่งออก</button>
+              <button 
+                onClick={clearFilters} 
+                className="text-sm text-slate-600 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                🗑️ ล้างตัวกรอง
+              </button>
+              <button 
+                onClick={() => onExport(results)} 
+                className="text-sm px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                ส่งออก
+              </button>
             </div>
           </div>
 
-          <div className="space-y-3 max-h-72 overflow-y-auto">
+          {/* Results grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-h-[60vh] overflow-y-auto hide-scrollbar">
             {results.map((p, i) => (
-              <PersonCard key={`${p.phone || i}-${i}`} person={p} onView={onViewPerson} onCall={handleCall} onMail={handleMail} />
+              <PersonCard 
+                key={`${p.phone || i}-${i}`} 
+                person={p} 
+                onView={onViewPerson} 
+                onCall={handleCall} 
+                onMail={handleMail} 
+              />
             ))}
-            {results.length === 0 && <div className="text-center text-slate-500 py-8">ไม่พบผลลัพธ์ที่ตรงกับคำค้น</div>}
+            {results.length === 0 && (
+              <div className="col-span-full text-center text-slate-500 py-12">
+                <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-600 mb-2">ไม่พบผลลัพธ์</h3>
+                <p className="text-sm">ลองเปลี่ยนคำค้นหาหรือตัวกรองข้อมูล</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -701,6 +928,7 @@ export default function PersonnelPage({ user }) {
   const [isEditingVacancy, setIsEditingVacancy] = useState(false);
 
   const [selectedChart, setSelectedChart] = useState("position"); // Default chart type
+  const [selectedAffiliation, setSelectedAffiliation] = useState(""); // For department filtering
   const [filters, setFilters] = useState({
     affiliation: "",
     department: "",
@@ -915,6 +1143,20 @@ export default function PersonnelPage({ user }) {
       return entries;
     }
 
+    if (type === 'department') {
+      // build from deph field - filter by selected affiliation if any
+      const groups = {};
+      const filteredData = selectedAffiliation 
+        ? personnelData.filter(p => (p.affiliation || 'ไม่ระบุ') === selectedAffiliation)
+        : personnelData;
+        
+      filteredData.forEach(p => {
+        const dept = p.deph || 'ไม่ระบุ';
+        groups[dept] = (groups[dept] || 0) + 1;
+      });
+      return Object.entries(groups).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+    }
+
     if (type === 'age') {
       // derive age groups from dob (basic)
       const groups = { '<30': 0, '30-39': 0, '40-49': 0, '50-59': 0, '60+': 0 };
@@ -947,7 +1189,27 @@ export default function PersonnelPage({ user }) {
     }
 
     return [];
-  }, [chartData, stats, personnelData]);
+  }, [chartData, stats, personnelData, selectedAffiliation]); // Add selectedAffiliation dependency
+
+  // Helper function to get chart title
+  const getChartTitle = (chartType) => {
+    switch (chartType) {
+      case "position":
+        return "ตำแหน่ง";
+      case "affiliation":
+        return "สัดส่วนแต่ละสังกัด";
+      case "department":
+        return selectedAffiliation 
+          ? `หน่วยงานใน${selectedAffiliation}`
+          : "หน่วยงาน (เลือกสังกัดก่อน)";
+      case "gender":
+        return "เพศ";
+      case "age":
+        return "ช่วงอายุ";
+      default:
+        return "ข้อมูลบุคลากร";
+    }
+  };
 
   const renderChart = () => {
     switch (selectedChart) {
@@ -968,6 +1230,35 @@ export default function PersonnelPage({ user }) {
             title="สัดส่วนแต่ละสังกัด"
             maxHeight="320px"
           />
+        );
+      case "department":
+        return (
+          <div className="space-y-4">
+            {!selectedAffiliation ? (
+              <div className="text-center py-8">
+                <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-600 mb-2">เลือกสังกัดก่อน</h3>
+                <p className="text-sm text-slate-500 mb-4">กรุณาเลือกสังกัดเพื่อดูหน่วยงานในสังกัดนั้น</p>
+                <select 
+                  value={selectedAffiliation}
+                  onChange={(e) => setSelectedAffiliation(e.target.value)}
+                  className="p-2 border border-slate-300 rounded-lg"
+                >
+                  <option value="">เลือกสังกัด</option>
+                  {Array.from(new Set(personnelData.map(p => p.affiliation || 'ไม่ระบุ'))).sort().map(aff => (
+                    <option key={aff} value={aff}>{aff}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <HorizontalBarChart
+                data={getChartData('department')}
+                colors={chartColors}
+                title={`หน่วยงานใน${selectedAffiliation}`}
+                maxHeight="320px"
+              />
+            )}
+          </div>
         );
       case "gender":
         return (
@@ -992,13 +1283,13 @@ export default function PersonnelPage({ user }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">ข้อมูลบุคลากร</h1>
+    <div className="w-full min-h-full p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">ข้อมูลบุคลากร</h1>
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setShowSearchModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow"
+            className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow text-sm transition-colors"
           >
             <Search className="w-4 h-4" />
             <span>ค้นหาบุคลากร</span>
@@ -1006,7 +1297,7 @@ export default function PersonnelPage({ user }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <EditableCard
           title="กรอบอัตรา"
           value={quota}
@@ -1036,49 +1327,85 @@ export default function PersonnelPage({ user }) {
         />
       </div>
 
-      <div className="flex items-center space-x-4 mb-6">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
         <button
           onClick={() => setSelectedChart("position")}
-          className={`px-4 py-2 rounded-lg ${selectedChart === "position" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors ${selectedChart === "position" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
         >
           ตำแหน่ง
         </button>
         <button
           onClick={() => setSelectedChart("affiliation")}
-          className={`px-4 py-2 rounded-lg ${selectedChart === "affiliation" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors ${selectedChart === "affiliation" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
         >
           สังกัด
         </button>
         <button
+          onClick={() => {
+            setSelectedChart("department");
+            if (!selectedAffiliation) {
+              // Auto-select first affiliation if none selected
+              const affiliations = Array.from(new Set(personnelData.map(p => p.affiliation || 'ไม่ระบุ'))).sort();
+              if (affiliations.length > 0) {
+                setSelectedAffiliation(affiliations[0]);
+              }
+            }
+          }}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors ${selectedChart === "department" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
+        >
+          หน่วยงาน
+        </button>
+        <button
           onClick={() => setSelectedChart("gender")}
-          className={`px-4 py-2 rounded-lg ${selectedChart === "gender" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors ${selectedChart === "gender" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
         >
           เพศ
         </button>
         <button
           onClick={() => setSelectedChart("age")}
-          className={`px-4 py-2 rounded-lg ${selectedChart === "age" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors ${selectedChart === "age" ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
         >
           ช่วงอายุ
         </button>
+        
+        {selectedChart === "department" && (
+          <select 
+            value={selectedAffiliation}
+            onChange={(e) => setSelectedAffiliation(e.target.value)}
+            className="ml-2 p-2 border border-slate-300 rounded-lg text-sm bg-white"
+          >
+            <option value="">เลือกสังกัด</option>
+            {Array.from(new Set(personnelData.map(p => p.affiliation || 'ไม่ระบุ'))).sort().map(aff => (
+              <option key={aff} value={aff}>{aff}</option>
+            ))}
+          </select>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟแท่ง</h2>
-          <HorizontalBarChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" maxHeight="500px" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟแท่ง</h2>
+          <div className="h-[520px] overflow-y-auto">
+            {renderChart()}
+          </div>
         </div>
-        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟวงกลม</h2>
-          <PieChartComponent data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟวงกลม</h2>
+          <div className="h-[520px] overflow-y-auto">
+            <PieChartComponent data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
+          </div>
         </div>
-        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟโดนัท</h2>
-          <DonutChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟโดนัท</h2>
+          <div className="h-[520px] overflow-y-auto">
+            <DonutChart data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
+          </div>
         </div>
-        <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">กราฟเส้น</h2>
-          <LineChart data={getChartData('affiliation')} colors={chartColors} title="สัดส่วนแต่ละสังกัด" />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟเส้น</h2>
+          <div className="h-[520px] overflow-y-auto">
+            <LineChart data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
+          </div>
         </div>
       </div>
 

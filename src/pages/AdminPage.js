@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ShieldCheck, History, UserCheck, UserX, Search, Download, Check, X, RefreshCw,
-  Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound, Database
+  Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound
 } from "lucide-react";
 import { CONFIG } from '../config';
 
@@ -770,7 +770,6 @@ export default function AdminPage({ user }) {
       { key: 'approval', label: 'คำขออนุมัติ', icon: UserCheck, component: <UserApproval user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'personnel', label: 'จัดการบุคลากร', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'logs', label: 'บันทึกกิจกรรม', icon: History, component: <ActivityLogs />, roles: ['super_admin', 'admin', 'supervisor'] },
-      { key: 'database', label: 'ฐานข้อมูล', icon: Database, component: <DatabaseManager user={user} />, roles: ['admin'] },
     ];
 
     const visibleTabs = useMemo(() => {

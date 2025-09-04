@@ -57,4 +57,42 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// GET /api/auth/verify - ตรวจสอบ token
+router.get('/verify', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: "Token ไม่ถูกต้อง" });
+        }
+
+        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // ดึงข้อมูลผู้ใช้จากฐานข้อมูล
+        const result = await pool.query('SELECT * FROM officers WHERE id = $1', [decoded.id]);
+        const user = result.rows[0];
+        
+        if (!user) {
+            return res.status(401).json({ success: false, message: "ผู้ใช้ไม่พบในระบบ" });
+        }
+
+        // ตรวจสอบสถานะผู้ใช้
+        if (user.status !== 'active') {
+            return res.status(401).json({ success: false, message: "บัญชีผู้ใช้ถูกระงับหรือรอการอนุมัติ" });
+        }
+
+        const { password, ...userData } = user;
+        res.json({ success: true, user: userData });
+    } catch (err) {
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(401).json({ success: false, message: "Token ไม่ถูกต้อง" });
+        }
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ success: false, message: "Token หมดอายุ" });
+        }
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+});
+
 module.exports = router;
