@@ -1,42 +1,44 @@
 import React from 'react';
 import { Sun, Moon, CloudSun, Target, FileText } from 'lucide-react';
+import { useAlert } from '../components/common/AlertSystem';
 
 const DocumentManagementPage = () => {
+  const { info } = useAlert();
   const documents = [
     {
       title: "เวรในเวลาราชการ",
       description: "จัดทำเอกสารสำหรับเวรปกติ",
       icon: Sun,
       color: "bg-yellow-500",
-      action: () => alert('Creating In-hours Document...')
+      action: () => info('สร้างเอกสารเวรในเวลาราชการ...', 'กำลังดำเนินการ')
     },
     {
       title: "เวรนอกเวลา (กลางวัน)",
       description: "สำหรับเวรวันหยุดและนักขัตฤกษ์",
       icon: CloudSun,
       color: "bg-orange-500",
-      action: () => alert('Creating Off-hours (Day) Document...')
+      action: () => info('สร้างเอกสารเวรนอกเวลาราชการ (กลางวัน)...', 'กำลังดำเนินการ')
     },
     {
       title: "เวรนอกเวลา (กลางคืน)",
       description: "สำหรับเวรช่วงเวลากลางคืน",
       icon: Moon,
       color: "bg-indigo-600",
-      action: () => alert('Creating Off-hours (Night) Document...')
+      action: () => info('สร้างเอกสารเวรนอกเวลาราชการ (กลางคืน)...', 'กำลังดำเนินการ')
     },
     {
       title: "ขออนุญาตพกพาอาวุธ",
       description: "จัดทำเอกสารขออนุญาตพกพาอาวุธปืน",
       icon: Target,
       color: "bg-red-600",
-      action: () => alert('Creating Firearm Permit Document...')
+      action: () => info('สร้างเอกสารอนุญาตใช้อาวุธ...', 'กำลังดำเนินการ')
     },
     {
       title: "รายงานประจำสัปดาห์",
       description: "สรุปผลการปฏิบัติงานรายสัปดาห์",
       icon: FileText,
       color: "bg-green-600",
-      action: () => alert('Creating Weekly Report...')
+      action: () => info('สร้างรายงานประจำสัปดาห์...', 'กำลังดำเนินการ')
     }
   ];
 

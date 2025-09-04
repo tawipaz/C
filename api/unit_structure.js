@@ -12,12 +12,6 @@ function validateUnitStructure(data, isUpdate = false) {
         }
     }
     
-    if (!isUpdate || data.unit_name !== undefined) {
-        if (!data.unit_name || data.unit_name.trim() === '') {
-            errors.push('ชื่อส่วนงานเป็นข้อมูลที่จำเป็น');
-        }
-    }
-    
     if (!isUpdate || data.unit_code !== undefined) {
         if (!data.unit_code || data.unit_code.trim() === '') {
             errors.push('รหัสส่วนงานเป็นข้อมูลที่จำเป็น');
@@ -39,24 +33,49 @@ function validateUnitStructure(data, isUpdate = false) {
     return errors;
 }
 
-module.exports = router;
+// Helper function to retry database queries with exponential backoff
+async function retryQuery(queryFn, maxRetries = 2, baseDelay = 2000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🔄 Database query attempt ${attempt}/${maxRetries}`);
+            const result = await queryFn();
+            console.log(`✅ Database query successful on attempt ${attempt}`);
+            return result;
+        } catch (error) {
+            console.error(`❌ Query attempt ${attempt} failed:`, error.message);
+            
+            // Don't retry for certain types of errors
+            if (error.code === '23505' || // Unique violation
+                error.code === '23503' || // Foreign key violation
+                error.code === '42P01' || // Table doesn't exist
+                error.code === '42703') { // Column doesn't exist
+                console.log(`🚫 Not retrying - permanent error: ${error.code}`);
+                throw error;
+            }
+            
+            if (attempt === maxRetries) {
+                console.log(`💀 All ${maxRetries} attempts failed, giving up`);
+                throw error;
+            }
+            
+            // Longer delay for cloud connections
+            const delay = baseDelay * attempt + Math.random() * 1000;
+            console.log(`⏳ Retrying query in ${Math.round(delay)}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
 
-// GET /api/unit-structure (Get all unit structures with officer details)
-router.get('/', async (req, res) => {
+// GET /api/unit-structure/duty-units (Get all duty units)
+router.get('/duty-units', async (req, res) => {
     try {
         const query = `
             SELECT 
-                us.*,
-                du.unit_name,
-                o.prefix,
-                o.firstname,
-                o.lastname,
-                o.phone,
-                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name
-            FROM unit_structure us
-            LEFT JOIN officers o ON us.position_number = o.position_number
-            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
-            ORDER BY us.unit_code, us.seniority_order
+                duty_id,
+                unit_code,
+                unit_name
+            FROM duty_unit
+            ORDER BY unit_code
         `;
         
         const result = await pool.query(query);
@@ -66,7 +85,7 @@ router.get('/', async (req, res) => {
             data: result.rows
         });
     } catch (error) {
-        console.error('Get unit structures error:', error);
+        console.error('Get duty units error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -75,216 +94,39 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /api/unit-structure/:id (Get unit structure by ID)
-router.get('/:id', async (req, res) => {
+// POST /api/unit-structure/duty-units (Create new duty unit)
+router.post('/duty-units', async (req, res) => {
     try {
-        const { id } = req.params;
+        const { unit_code, unit_name } = req.body;
         
-        const query = `
-            SELECT 
-                us.*,
-                du.unit_name,
-                o.prefix,
-                o.firstname,
-                o.lastname,
-                o.phone,
-                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name
-            FROM unit_structure us
-            LEFT JOIN officers o ON us.position_number = o.position_number
-            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
-            WHERE us.id = $1
-        `;
-        
-        const result = await pool.query(query, [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: result.rows[0]
-        });
-    } catch (error) {
-        console.error('Get unit structure by ID error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
-            error: error.message
-        });
-    }
-});
-
-// GET /api/unit-structure/by-unit/:unit_code (Get units grouped by unit_code)
-router.get('/by-unit/:unit_code', async (req, res) => {
-    try {
-        const { unit_code } = req.params;
-        
-        const query = `
-            SELECT 
-                us.*,
-                du.unit_name,
-                o.prefix,
-                o.firstname,
-                o.lastname,
-                o.phone,
-                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name
-            FROM unit_structure us
-            LEFT JOIN officers o ON us.position_number = o.position_number
-            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
-            WHERE us.unit_code = $1
-            ORDER BY us.seniority_order
-        `;
-        
-        const result = await pool.query(query, [unit_code]);
-        
-        res.json({
-            success: true,
-            data: result.rows
-        });
-    } catch (error) {
-        console.error('Get units by code error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
-            error: error.message
-        });
-    }
-});
-
-// POST /api/unit-structure (Create new unit structure)
-router.post('/', async (req, res) => {
-    try {
-        const { position_number, unit_code, role, seniority_order } = req.body;
-        
-        // Validate input
-        const validationErrors = validateUnitStructure(req.body);
-        if (validationErrors.length > 0) {
+        if (!unit_code || !unit_name) {
             return res.status(400).json({
                 success: false,
-                message: validationErrors.join(', ')
-            });
-        }
-        
-        // Check if unit_code exists in duty_unit table
-        const unitCheck = await pool.query(
-            'SELECT unit_code FROM duty_unit WHERE unit_code = $1',
-            [unit_code]
-        );
-        
-        if (unitCheck.rows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ไม่พบรหัสส่วนงานนี้ในระบบ'
-            });
-        }
-        
-        // Check if position_number exists in officers table
-        const officerCheck = await pool.query(
-            'SELECT position_number FROM officers WHERE position_number = $1',
-            [position_number]
-        );
-        
-        if (officerCheck.rows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ไม่พบเลขตำแหน่งนี้ในระบบ'
-            });
-        }
-        
-        // Check if position_number already exists in unit_structure
-        const existingPosition = await pool.query(
-            'SELECT id FROM unit_structure WHERE position_number = $1',
-            [position_number]
-        );
-        
-        if (existingPosition.rows.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'เลขตำแหน่งนี้ถูกใช้งานแล้วในโครงสร้างส่วนงาน'
-            });
-        }
-        
-        // Check role constraints
-        if (role === 'director') {
-            const directorCheck = await pool.query(
-                'SELECT id FROM unit_structure WHERE role = $1',
-                ['director']
-            );
-            
-            if (directorCheck.rows.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'มีผู้อำนวยการศูนย์รักษาความปลอดภัยแล้ว (สามารถมีได้เพียงคนเดียว)'
-                });
-            }
-        }
-        
-        if (role === 'supervisor') {
-            const supervisorCheck = await pool.query(
-                'SELECT id FROM unit_structure WHERE role = $1 AND unit_code = $2',
-                ['supervisor', unit_code]
-            );
-            
-            if (supervisorCheck.rows.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ส่วนงานนี้มีหัวหน้าส่วนแล้ว (สามารถมีได้เพียงคนเดียวต่อส่วน)'
-                });
-            }
-            
-            // For supervisor, seniority_order should be 1
-            if (Number(seniority_order) !== 1) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'หัวหน้าส่วนต้องมีลำดับอาวุโสเป็น 1 เสมอ'
-                });
-            }
-        }
-        
-        // Check if seniority_order already exists in the same unit
-        const seniorityCheck = await pool.query(
-            'SELECT id FROM unit_structure WHERE unit_code = $1 AND seniority_order = $2',
-            [unit_code, seniority_order]
-        );
-        
-        if (seniorityCheck.rows.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ลำดับอาวุโสนี้ถูกใช้แล้วในส่วนงานนี้'
+                message: 'รหัสส่วนงานและชื่อส่วนงานเป็นข้อมูลที่จำเป็น'
             });
         }
         
         const insertQuery = `
-            INSERT INTO unit_structure 
-            (position_number, unit_code, role, seniority_order, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
-            RETURNING id
+            INSERT INTO duty_unit (unit_code, unit_name)
+            VALUES ($1, $2)
+            RETURNING duty_id, unit_code, unit_name
         `;
         
-        const result = await pool.query(insertQuery, [
-            position_number,
-            unit_code,
-            role,
-            seniority_order
-        ]);
+        const result = await pool.query(insertQuery, [unit_code, unit_name]);
         
         res.json({
             success: true,
-            message: 'สร้างโครงสร้างส่วนงานสำเร็จ',
-            data: {
-                id: result.rows[0].id,
-                position_number,
-                unit_code,
-                role,
-                seniority_order
-            }
+            message: 'สร้างส่วนงานสำเร็จ',
+            data: result.rows[0]
         });
     } catch (error) {
-        console.error('Create unit structure error:', error);
+        if (error.code === '23505') { // Unique violation
+            return res.status(409).json({
+                success: false,
+                message: 'รหัสส่วนงานนี้มีอยู่แล้ว'
+            });
+        }
+        console.error('Create duty unit error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -293,165 +135,48 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PUT /api/unit-structure/:id (Update unit structure)
-router.put('/:id', async (req, res) => {
+// PUT /api/unit-structure/duty-units/:duty_id (Update duty unit)
+router.put('/duty-units/:duty_id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const { position_number, unit_code, role, seniority_order } = req.body;
+        const { duty_id } = req.params;
+        const { unit_code, unit_name } = req.body;
         
-        // Validate input
-        const validationErrors = validateUnitStructure(req.body, true);
-        if (validationErrors.length > 0) {
+        if (!unit_code || !unit_name) {
             return res.status(400).json({
                 success: false,
-                message: validationErrors.join(', ')
+                message: 'รหัสส่วนงานและชื่อส่วนงานเป็นข้อมูลที่จำเป็น'
             });
         }
-        
-        // Get current data
-        const currentData = await pool.query(
-            'SELECT * FROM unit_structure WHERE id = $1',
-            [id]
-        );
-        
-        if (currentData.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
-            });
-        }
-        
-        const current = currentData.rows[0];
-        
-        // Check unit_code if changed
-        if (unit_code && unit_code !== current.unit_code) {
-            const unitCheck = await pool.query(
-                'SELECT unit_code FROM duty_unit WHERE unit_code = $1',
-                [unit_code]
-            );
-            
-            if (unitCheck.rows.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ไม่พบรหัสส่วนงานนี้ในระบบ'
-                });
-            }
-        }
-        
-        // Check position_number if changed
-        if (position_number && position_number !== current.position_number) {
-            const officerCheck = await pool.query(
-                'SELECT position_number FROM officers WHERE position_number = $1',
-                [position_number]
-            );
-            
-            if (officerCheck.rows.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ไม่พบเลขตำแหน่งนี้ในระบบ'
-                });
-            }
-            
-            const existingPosition = await pool.query(
-                'SELECT id FROM unit_structure WHERE position_number = $1 AND id != $2',
-                [position_number, id]
-            );
-            
-            if (existingPosition.rows.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'เลขตำแหน่งนี้ถูกใช้งานแล้วในโครงสร้างส่วนงาน'
-                });
-            }
-        }
-        
-        // Check role constraints if changed
-        if (role && role !== current.role) {
-            if (role === 'director') {
-                const directorCheck = await pool.query(
-                    'SELECT id FROM unit_structure WHERE role = $1 AND id != $2',
-                    ['director', id]
-                );
-                
-                if (directorCheck.rows.length > 0) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'มีผู้อำนวยการศูนย์รักษาความปลอดภัยแล้ว'
-                    });
-                }
-            }
-            
-            if (role === 'supervisor') {
-                const checkUnitCode = unit_code || current.unit_code;
-                const supervisorCheck = await pool.query(
-                    'SELECT id FROM unit_structure WHERE role = $1 AND unit_code = $2 AND id != $3',
-                    ['supervisor', checkUnitCode, id]
-                );
-                
-                if (supervisorCheck.rows.length > 0) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'ส่วนงานนี้มีหัวหน้าส่วนแล้ว'
-                    });
-                }
-            }
-        }
-        
-        // Check seniority_order if changed
-        if (seniority_order && seniority_order !== current.seniority_order) {
-            const checkUnitCode = unit_code || current.unit_code;
-            const seniorityCheck = await pool.query(
-                'SELECT id FROM unit_structure WHERE unit_code = $1 AND seniority_order = $2 AND id != $3',
-                [checkUnitCode, seniority_order, id]
-            );
-            
-            if (seniorityCheck.rows.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ลำดับอาวุโสนี้ถูกใช้แล้วในส่วนงานนี้'
-                });
-            }
-        }
-        
-        // Build update query
-        const updateFields = [];
-        const updateValues = [];
-        let paramIndex = 1;
-        
-        if (position_number !== undefined) {
-            updateFields.push(`position_number = $${paramIndex++}`);
-            updateValues.push(position_number);
-        }
-        if (unit_code !== undefined) {
-            updateFields.push(`unit_code = $${paramIndex++}`);
-            updateValues.push(unit_code);
-        }
-        if (role !== undefined) {
-            updateFields.push(`role = $${paramIndex++}`);
-            updateValues.push(role);
-        }
-        if (seniority_order !== undefined) {
-            updateFields.push(`seniority_order = $${paramIndex++}`);
-            updateValues.push(seniority_order);
-        }
-        
-        updateFields.push(`updated_at = NOW()`);
-        updateValues.push(id);
         
         const updateQuery = `
-            UPDATE unit_structure 
-            SET ${updateFields.join(', ')}
-            WHERE id = $${paramIndex}
+            UPDATE duty_unit 
+            SET unit_code = $1, unit_name = $2 
+            WHERE duty_id = $3 
+            RETURNING duty_id, unit_code, unit_name
         `;
         
-        await pool.query(updateQuery, updateValues);
+        const result = await pool.query(updateQuery, [unit_code, unit_name, duty_id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลส่วนงาน'
+            });
+        }
         
         res.json({
             success: true,
-            message: 'อัปเดตโครงสร้างส่วนงานสำเร็จ'
+            message: 'อัปเดตส่วนงานสำเร็จ',
+            data: result.rows[0]
         });
     } catch (error) {
-        console.error('Update unit structure error:', error);
+        if (error.code === '23505') { // Unique violation
+            return res.status(409).json({
+                success: false,
+                message: 'รหัสส่วนงานนี้มีอยู่แล้ว'
+            });
+        }
+        console.error('Update duty unit error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -460,29 +185,37 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/unit-structure/:id (Delete unit structure)
-router.delete('/:id', async (req, res) => {
+// DELETE /api/unit-structure/duty-units/:duty_id (Delete duty unit)
+router.delete('/duty-units/:duty_id', async (req, res) => {
     try {
-        const { id } = req.params;
+        const { duty_id } = req.params;
         
-        const result = await pool.query(
-            'DELETE FROM unit_structure WHERE id = $1',
-            [id]
+        // Check if duty unit is being used in unit_structure
+        const usageCheck = await pool.query(
+            'SELECT COUNT(*) as count FROM unit_structure WHERE unit_code = (SELECT unit_code FROM duty_unit WHERE duty_id = $1)',
+            [duty_id]
         );
-        
-        if (result.rowCount === 0) {
+
+        if (parseInt(usageCheck.rows[0].count) > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'ไม่สามารถลบส่วนงานนี้ได้ เนื่องจากมีการใช้งานในโครงสร้างส่วนงาน'
+            });
+        }
+
+        const result = await pool.query('DELETE FROM duty_unit WHERE duty_id = $1', [duty_id]);        if (result.rowCount === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
+                message: 'ไม่พบข้อมูลส่วนงาน'
             });
         }
         
         res.json({
             success: true,
-            message: 'ลบโครงสร้างส่วนงานสำเร็จ'
+            message: 'ลบส่วนงานสำเร็จ'
         });
     } catch (error) {
-        console.error('Delete unit structure error:', error);
+        console.error('Delete duty unit error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -583,8 +316,8 @@ router.get('/hierarchy', async (req, res) => {
                 o.firstname,
                 o.lastname,
                 o.phone,
-                du.unit_name,
-                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name
+                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name,
+                du.unit_name
             FROM unit_structure us
             LEFT JOIN officers o ON us.position_number = o.position_number
             LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
@@ -632,7 +365,7 @@ router.get('/hierarchy', async (req, res) => {
             data: hierarchy
         });
     } catch (error) {
-        console.error('Get hierarchy error:', error);
+        console.error('Get unit hierarchy error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -641,18 +374,59 @@ router.get('/hierarchy', async (req, res) => {
     }
 });
 
-// ===== DUTY UNIT MANAGEMENT ENDPOINTS =====
+// GET /api/unit-structure/by-unit/:unit_code (Get units grouped by unit_code)
+router.get('/by-unit/:unit_code', async (req, res) => {
+    try {
+        const { unit_code } = req.params;
+        
+        const query = `
+            SELECT 
+                us.*,
+                o.prefix,
+                o.firstname,
+                o.lastname,
+                o.phone,
+                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name,
+                du.unit_name
+            FROM unit_structure us
+            LEFT JOIN officers o ON us.position_number = o.position_number
+            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
+            WHERE us.unit_code = $1
+            ORDER BY us.seniority_order
+        `;
+        
+        const result = await pool.query(query, [unit_code]);
+        
+        res.json({
+            success: true,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Get units by code error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
+            error: error.message
+        });
+    }
+});
 
-// GET /api/unit-structure/duty-units (Get all duty units)
-router.get('/duty-units', async (req, res) => {
+// GET /api/unit-structure (Get all unit structures with officer details)
+router.get('/', async (req, res) => {
     try {
         const query = `
             SELECT 
-                duty_id,
-                unit_code,
-                unit_name
-            FROM duty_unit
-            ORDER BY unit_code
+                us.*,
+                o.prefix,
+                o.firstname,
+                o.lastname,
+                o.phone,
+                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name,
+                du.unit_name
+            FROM unit_structure us
+            LEFT JOIN officers o ON us.position_number = o.position_number
+            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
+            ORDER BY us.unit_code, us.seniority_order
         `;
         
         const result = await pool.query(query);
@@ -662,7 +436,7 @@ router.get('/duty-units', async (req, res) => {
             data: result.rows
         });
     } catch (error) {
-        console.error('Get duty units error:', error);
+        console.error('Get unit structures error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -671,61 +445,41 @@ router.get('/duty-units', async (req, res) => {
     }
 });
 
-// POST /api/unit-structure/duty-units (Create new duty unit)
-router.post('/duty-units', async (req, res) => {
+// GET /api/unit-structure/:id (Get unit structure by ID)
+router.get('/:id', async (req, res) => {
     try {
-        const { unit_code, unit_name } = req.body;
+        const { id } = req.params;
         
-        // Validate input
-        if (!unit_code || !unit_name) {
-            return res.status(400).json({
-                success: false,
-                message: 'ต้องระบุรหัสส่วนงานและชื่อส่วนงาน'
-            });
-        }
-        
-        if (unit_code.length > 10) {
-            return res.status(400).json({
-                success: false,
-                message: 'รหัสส่วนงานต้องไม่เกิน 10 ตัวอักษร'
-            });
-        }
-        
-        if (unit_name.length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: 'ชื่อส่วนงานต้องไม่เกิน 200 ตัวอักษร'
-            });
-        }
-        
-        // Check if unit_code already exists
-        const existingUnit = await pool.query(
-            'SELECT duty_id FROM duty_unit WHERE unit_code = $1',
-            [unit_code]
-        );
-        
-        if (existingUnit.rows.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'รหัสส่วนงานนี้มีอยู่แล้วในระบบ'
-            });
-        }
-        
-        const insertQuery = `
-            INSERT INTO duty_unit (unit_code, unit_name)
-            VALUES ($1, $2)
-            RETURNING duty_id, unit_code, unit_name
+        const query = `
+            SELECT 
+                us.*,
+                o.prefix,
+                o.firstname,
+                o.lastname,
+                o.phone,
+                CONCAT(o.prefix, ' ', o.firstname, ' ', o.lastname) as full_name,
+                du.unit_name
+            FROM unit_structure us
+            LEFT JOIN officers o ON us.position_number = o.position_number
+            LEFT JOIN duty_unit du ON us.unit_code = du.unit_code
+            WHERE us.id = $1
         `;
         
-        const result = await pool.query(insertQuery, [unit_code, unit_name]);
+        const result = await pool.query(query, [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
+            });
+        }
         
         res.json({
             success: true,
-            message: 'สร้างส่วนงานสำเร็จ',
             data: result.rows[0]
         });
     } catch (error) {
-        console.error('Create duty unit error:', error);
+        console.error('Get unit structure by ID error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -734,78 +488,131 @@ router.post('/duty-units', async (req, res) => {
     }
 });
 
-// PUT /api/unit-structure/duty-units/:id (Update duty unit)
-router.put('/duty-units/:id', async (req, res) => {
+// POST /api/unit-structure (Create new unit structure)
+router.post('/', async (req, res) => {
     try {
-        const { id } = req.params;
-        const { unit_code, unit_name } = req.body;
+        const { position_number, unit_code, unit_name, role, seniority_order } = req.body;
         
-        // Validate input
-        if (!unit_code || !unit_name) {
+        // Validate input data
+        const validationErrors = validateUnitStructure(req.body);
+        if (validationErrors.length > 0) {
             return res.status(400).json({
                 success: false,
-                message: 'ต้องระบุรหัสส่วนงานและชื่อส่วนงาน'
+                message: 'ข้อมูลไม่ถูกต้อง',
+                errors: validationErrors
             });
         }
         
-        if (unit_code.length > 10) {
-            return res.status(400).json({
-                success: false,
-                message: 'รหัสส่วนงานต้องไม่เกิน 10 ตัวอักษร'
-            });
-        }
-        
-        if (unit_name.length > 200) {
-            return res.status(400).json({
-                success: false,
-                message: 'ชื่อส่วนงานต้องไม่เกิน 200 ตัวอักษร'
-            });
-        }
-        
-        // Check if duty unit exists
-        const existingUnit = await pool.query(
-            'SELECT duty_id, unit_code FROM duty_unit WHERE duty_id = $1',
-            [id]
+        // Check if position_number already exists
+        const existingCheck = await pool.query(
+            'SELECT id FROM unit_structure WHERE position_number = $1',
+            [position_number]
         );
         
-        if (existingUnit.rows.length === 0) {
-            return res.status(404).json({
+        if (existingCheck.rows.length > 0) {
+            return res.status(409).json({
                 success: false,
-                message: 'ไม่พบข้อมูลส่วนงานนี้'
+                message: 'เลขตำแหน่งนี้มีอยู่ในโครงสร้างแล้ว'
             });
         }
         
-        // Check if new unit_code already exists (except current record)
-        if (unit_code !== existingUnit.rows[0].unit_code) {
-            const duplicateCheck = await pool.query(
-                'SELECT duty_id FROM duty_unit WHERE unit_code = $1 AND duty_id != $2',
-                [unit_code, id]
+        // Check if officer exists
+        const officerCheck = await pool.query(
+            'SELECT position_number FROM officers WHERE position_number = $1',
+            [position_number]
+        );
+        
+        if (officerCheck.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลข้าราชการที่มีเลขตำแหน่งนี้'
+            });
+        }
+        
+        // Check if unit_code exists in duty_unit table
+        const unitCheck = await pool.query(
+            'SELECT unit_code, unit_name FROM duty_unit WHERE unit_code = $1',
+            [unit_code]
+        );
+        
+        if (unitCheck.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลส่วนงานที่มีรหัสนี้'
+            });
+        }
+        
+        // Use unit_name from request body or get from duty_unit table
+        const finalUnitName = unit_name || unitCheck.rows[0].unit_name;
+        
+        // Role-specific checks
+        if (role === 'director') {
+            const directorCheck = await pool.query(
+                'SELECT id FROM unit_structure WHERE role = $1',
+                ['director']
             );
             
-            if (duplicateCheck.rows.length > 0) {
-                return res.status(400).json({
+            if (directorCheck.rows.length > 0) {
+                return res.status(409).json({
                     success: false,
-                    message: 'รหัสส่วนงานนี้มีอยู่แล้วในระบบ'
+                    message: 'มีผู้อำนวยการศูนย์รักษาความปลอดภัยแล้ว'
+                });
+            }
+        } else if (role === 'supervisor') {
+            const supervisorCheck = await pool.query(
+                'SELECT id FROM unit_structure WHERE role = $1 AND unit_code = $2',
+                ['supervisor', unit_code]
+            );
+            
+            if (supervisorCheck.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'ส่วนงานนี้มีหัวหน้าส่วนแล้ว'
                 });
             }
         }
         
-        const updateQuery = `
-            UPDATE duty_unit 
-            SET unit_code = $1, unit_name = $2
-            WHERE duty_id = $3
-            RETURNING duty_id, unit_code, unit_name
+        // Auto-assign seniority order if not provided or if it conflicts
+        let finalSeniorityOrder = seniority_order;
+        
+        if (!finalSeniorityOrder) {
+            // If no seniority order provided, get the next available number
+            const maxSeniorityResult = await pool.query(
+                'SELECT COALESCE(MAX(seniority_order), 0) + 1 as next_order FROM unit_structure WHERE unit_code = $1',
+                [unit_code]
+            );
+            finalSeniorityOrder = maxSeniorityResult.rows[0].next_order;
+        } else {
+            // Check if provided seniority order conflicts
+            const seniorityCheck = await pool.query(
+                'SELECT id FROM unit_structure WHERE unit_code = $1 AND seniority_order = $2',
+                [unit_code, finalSeniorityOrder]
+            );
+            
+            if (seniorityCheck.rows.length > 0) {
+                // If conflicts, shift existing members down and insert at requested position
+                await pool.query(
+                    'UPDATE unit_structure SET seniority_order = seniority_order + 1 WHERE unit_code = $1 AND seniority_order >= $2',
+                    [unit_code, finalSeniorityOrder]
+                );
+            }
+        }
+        
+        const insertQuery = `
+            INSERT INTO unit_structure (position_number, unit_code, unit_name, role, seniority_order)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
         `;
         
-        const result = await pool.query(updateQuery, [unit_code, unit_name, id]);
+        const result = await pool.query(insertQuery, [position_number, unit_code, finalUnitName, role, finalSeniorityOrder]);
         
         res.json({
             success: true,
-            message: 'อัปเดตส่วนงานสำเร็จ',
+            message: 'สร้างโครงสร้างส่วนงานสำเร็จ',
             data: result.rows[0]
         });
     } catch (error) {
-        console.error('Update duty unit error:', error);
+        console.error('Create unit structure error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
@@ -814,42 +621,211 @@ router.put('/duty-units/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/unit-structure/duty-units/:id (Delete duty unit)
-router.delete('/duty-units/:id', async (req, res) => {
+// PUT /api/unit-structure/:id (Update unit structure)
+router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const { position_number, unit_code, role, seniority_order } = req.body;
         
-        // Check if duty unit is being used in unit_structure
-        const usageCheck = await pool.query(
-            'SELECT COUNT(*) as count FROM unit_structure WHERE unit_code = (SELECT unit_code FROM duty_unit WHERE duty_id = $1)',
-            [id]
-        );
-        
-        if (parseInt(usageCheck.rows[0].count) > 0) {
+        // Validate input data
+        const validationErrors = validateUnitStructure(req.body, true);
+        if (validationErrors.length > 0) {
             return res.status(400).json({
                 success: false,
-                message: 'ไม่สามารถลบส่วนงานนี้ได้ เนื่องจากมีการใช้งานในโครงสร้างส่วนงาน'
+                message: 'ข้อมูลไม่ถูกต้อง',
+                errors: validationErrors
             });
         }
         
-        const result = await pool.query(
-            'DELETE FROM duty_unit WHERE duty_id = $1',
+        // Check if record exists
+        const existingCheck = await pool.query(
+            'SELECT * FROM unit_structure WHERE id = $1',
             [id]
         );
         
-        if (result.rowCount === 0) {
+        if (existingCheck.rows.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'ไม่พบข้อมูลส่วนงานนี้'
+                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
+            });
+        }
+        
+        const existing = existingCheck.rows[0];
+        
+        // Check if position_number is being changed and already exists elsewhere
+        if (position_number && position_number !== existing.position_number) {
+            const positionCheck = await pool.query(
+                'SELECT id FROM unit_structure WHERE position_number = $1 AND id != $2',
+                [position_number, id]
+            );
+            
+            if (positionCheck.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'เลขตำแหน่งนี้มีอยู่ในโครงสร้างแล้ว'
+                });
+            }
+            
+            // Check if new officer exists
+            const officerCheck = await pool.query(
+                'SELECT position_number FROM officers WHERE position_number = $1',
+                [position_number]
+            );
+            
+            if (officerCheck.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'ไม่พบข้อมูลข้าราชการที่มีเลขตำแหน่งนี้'
+                });
+            }
+        }
+        
+        // Check if unit_code exists in duty_unit table
+        if (unit_code && unit_code !== existing.unit_code) {
+            const unitCheck = await pool.query(
+                'SELECT unit_code FROM duty_unit WHERE unit_code = $1',
+                [unit_code]
+            );
+            
+            if (unitCheck.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'ไม่พบข้อมูลส่วนงานที่มีรหัสนี้'
+                });
+            }
+        }
+        
+        // Role-specific checks
+        if (role && role !== existing.role) {
+            if (role === 'director') {
+                const directorCheck = await pool.query(
+                    'SELECT id FROM unit_structure WHERE role = $1 AND id != $2',
+                    ['director', id]
+                );
+                
+                if (directorCheck.rows.length > 0) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'มีผู้อำนวยการศูนย์รักษาความปลอดภัยแล้ว'
+                    });
+                }
+            } else if (role === 'supervisor') {
+                const checkUnitCode = unit_code || existing.unit_code;
+                const supervisorCheck = await pool.query(
+                    'SELECT id FROM unit_structure WHERE role = $1 AND unit_code = $2 AND id != $3',
+                    ['supervisor', checkUnitCode, id]
+                );
+                
+                if (supervisorCheck.rows.length > 0) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'ส่วนงานนี้มีหัวหน้าส่วนแล้ว'
+                    });
+                }
+            }
+        }
+        
+        // Check seniority order uniqueness within unit
+        if (seniority_order && seniority_order !== existing.seniority_order) {
+            const checkUnitCode = unit_code || existing.unit_code;
+            const seniorityCheck = await pool.query(
+                'SELECT id FROM unit_structure WHERE unit_code = $1 AND seniority_order = $2 AND id != $3',
+                [checkUnitCode, seniority_order, id]
+            );
+            
+            if (seniorityCheck.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'ลำดับอาวุโสนี้มีอยู่แล้วในส่วนงาน'
+                });
+            }
+        }
+        
+        // Build dynamic update query
+        const updateFields = [];
+        const updateValues = [];
+        let paramIndex = 1;
+        
+        if (position_number !== undefined) {
+            updateFields.push(`position_number = $${paramIndex}`);
+            updateValues.push(position_number);
+            paramIndex++;
+        }
+        
+        if (unit_code !== undefined) {
+            updateFields.push(`unit_code = $${paramIndex}`);
+            updateValues.push(unit_code);
+            paramIndex++;
+        }
+        
+        if (role !== undefined) {
+            updateFields.push(`role = $${paramIndex}`);
+            updateValues.push(role);
+            paramIndex++;
+        }
+        
+        if (seniority_order !== undefined) {
+            updateFields.push(`seniority_order = $${paramIndex}`);
+            updateValues.push(seniority_order);
+            paramIndex++;
+        }
+        
+        if (updateFields.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'ไม่มีข้อมูลที่ต้องการอัปเดต'
+            });
+        }
+        
+        updateValues.push(id);
+        const updateQuery = `
+            UPDATE unit_structure 
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING *
+        `;
+        
+        const result = await pool.query(updateQuery, updateValues);
+        
+        res.json({
+            success: true,
+            message: 'อัปเดตโครงสร้างส่วนงานสำเร็จ',
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Update unit structure error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',
+            error: error.message
+        });
+    }
+});
+
+// DELETE /api/unit-structure/:id (Delete unit structure)
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const result = await pool.query(
+            'DELETE FROM unit_structure WHERE id = $1 RETURNING *',
+            [id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลโครงสร้างส่วนงาน'
             });
         }
         
         res.json({
             success: true,
-            message: 'ลบส่วนงานสำเร็จ'
+            message: 'ลบโครงสร้างส่วนงานสำเร็จ',
+            data: result.rows[0]
         });
     } catch (error) {
-        console.error('Delete duty unit error:', error);
+        console.error('Delete unit structure error:', error);
         res.status(500).json({
             success: false,
             message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์',

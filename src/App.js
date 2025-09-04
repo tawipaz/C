@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import DocumentManagementPage from "./pages/DocumentManagementPage";
 import { CONFIG } from './config';
+import { AlertProvider } from './components/common/AlertSystem';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -90,43 +91,46 @@ function App() {
   };
 
   const handleOpenNotifications = () => {
-    alert("การแจ้งเตือน - ฟีเจอร์นี้อยู่ระหว่างการพัฒนา");
+    // ใช้ alert system แทน
+    // alert("การแจ้งเตือน - ฟีเจอร์นี้อยู่ระหว่างการพัฒนา");
   };
 
   return (
-    <div className="bg-slate-100 min-h-screen">
-      <div className="container mx-auto p-4">
-        {authLoading ? (
-          <div className="flex items-center justify-center min-h-screen"><div>กำลังโหลด...</div></div>
-        ) : (
-          <Routes>
-            <Route path="/on-duty" element={<OnDutyPage />} />
-            <Route 
-              path="/login" 
-              element={!user ? <LoginPage onLogin={handleLogin} /> : <Navigate to="/" />} 
-            />
-            
-            <Route element={<ProtectedRoute user={user} />}>
-              <Route element={<AppLayout user={user} onLogout={handleLogout} onOpenNotifications={handleOpenNotifications} />}>
-                <Route path="/" element={<DashboardPage user={user} />} />
-                <Route path="/personnel" element={<PersonnelPage user={user} />} />
-                <Route path="/tasks" element={<ShiftWorkPage user={user} />} />
-                <Route path="/shifts" element={<ShiftWorkPage user={user} />} />
-                <Route path="/chat" element={<ChatPage />} />
-                <Route path="/profile" element={<ProfilePage user={user} />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/document-management" element={<DocumentManagementPage />} />
-                {user?.role === 'admin' && (
-                  <Route path="/admin" element={<AdminPage user={user} />} />
-                )}
+    <AlertProvider>
+      <div className="bg-slate-100 min-h-screen">
+        <div className="container mx-auto p-4">
+          {authLoading ? (
+            <div className="flex items-center justify-center min-h-screen"><div>กำลังโหลด...</div></div>
+          ) : (
+            <Routes>
+              <Route path="/on-duty" element={<OnDutyPage />} />
+              <Route 
+                path="/login" 
+                element={!user ? <LoginPage onLogin={handleLogin} /> : <Navigate to="/" />} 
+              />
+              
+              <Route element={<ProtectedRoute user={user} />}>
+                <Route element={<AppLayout user={user} onLogout={handleLogout} onOpenNotifications={handleOpenNotifications} />}>
+                  <Route path="/" element={<DashboardPage user={user} />} />
+                  <Route path="/personnel" element={<PersonnelPage user={user} />} />
+                  <Route path="/tasks" element={<ShiftWorkPage user={user} />} />
+                  <Route path="/shifts" element={<ShiftWorkPage user={user} />} />
+                  <Route path="/chat" element={<ChatPage />} />
+                  <Route path="/profile" element={<ProfilePage user={user} />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/document-management" element={<DocumentManagementPage />} />
+                  {user?.role === 'admin' && (
+                    <Route path="/admin" element={<AdminPage user={user} />} />
+                  )}
+                </Route>
               </Route>
-            </Route>
 
-            <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
-          </Routes>
-        )}
+              <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
+            </Routes>
+          )}
+        </div>
       </div>
-    </div>
+    </AlertProvider>
   );
 }
 

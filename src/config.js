@@ -17,7 +17,7 @@ export const CONFIG = {
   LOGS_API: `${API_BASE_URL}/api/logs`,
   ADMIN_API: `${API_BASE_URL}/api/admin`,
   AUTH_API: `${API_BASE_URL}/api/auth`,
-  UNIT_STRUCTURE_API: `${API_BASE_URL}/api/unit_structure`,
+  UNIT_STRUCTURE_API: `${API_BASE_URL}/api/unit-structure`,
   
   // Redirect URI
   REDIRECT_URI: isDevelopment

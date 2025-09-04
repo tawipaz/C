@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Building, X } from 'lucide-react';
 import { CONFIG } from '../config'; // ต้องมีไฟล์ config ที่เก็บ API URL
+import { useAlert } from './common/AlertSystem';
 
 const API_URL = `${CONFIG.API_BASE_URL}/units.php`; // สมมติว่า API endpoint คือ units.php
 
 const UnitManagement = () => {
+  const { success, error } = useAlert();
   const [units, setUnits] = useState([]);
   const [officers, setOfficers] = useState([]); // สำหรับ Dropdown เลือก Supervisor
   const [loading, setLoading] = useState(true);
@@ -75,8 +77,9 @@ const UnitManagement = () => {
       if (result.success) {
         fetchUnits(); // Refresh list
         handleCloseModal();
+        success('บันทึกข้อมูลหน่วยงานสำเร็จ');
       } else {
-        alert(`Error: ${result.message}`);
+        error(`เกิดข้อผิดพลาด: ${result.message}`);
       }
     } catch (error) {
       console.error("Error saving unit:", error);
@@ -95,8 +98,9 @@ const UnitManagement = () => {
       const result = await response.json();
       if (result.success) {
         fetchUnits(); // Refresh list
+        success('ลบหน่วยงานสำเร็จ');
       } else {
-        alert(`Error: ${result.message}`);
+        error(`เกิดข้อผิดพลาด: ${result.message}`);
       }
     } catch (error) {
       console.error("Error deleting unit:", error);

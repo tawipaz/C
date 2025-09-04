@@ -20,8 +20,10 @@ import {
   AlertCircle,
   RefreshCw
 } from "lucide-react";
+import { useAlert } from './common/AlertSystem';
 
 const DocumentGenerator = ({ template, onBack, onSave }) => {
+  const { success, error } = useAlert();
   const [placeholderValues, setPlaceholderValues] = useState(
     template.placeholders.reduce((acc, placeholder) => {
       acc[placeholder] = '';
@@ -115,9 +117,9 @@ const DocumentGenerator = ({ template, onBack, onSave }) => {
       };
       
       onSave?.(documentData);
-      alert('บันทึกเอกสารเรียบร้อยแล้ว');
-    } catch (error) {
-      alert('เกิดข้อผิดพลาดในการบันทึก');
+      success('บันทึกเอกสารเรียบร้อยแล้ว');
+    } catch (err) {
+      error('เกิดข้อผิดพลาดในการบันทึก');
     } finally {
       setIsSaving(false);
     }
@@ -162,11 +164,11 @@ const DocumentGenerator = ({ template, onBack, onSave }) => {
 
   const copyToClipboard = useCallback(() => {
     navigator.clipboard.writeText(generatedDocument).then(() => {
-      alert('คัดลอกเอกสารแล้ว');
+      success('คัดลอกเอกสารแล้ว');
     }).catch(() => {
-      alert('ไม่สามารถคัดลอกได้');
+      error('ไม่สามารถคัดลอกได้');
     });
-  }, [generatedDocument]);
+  }, [generatedDocument, success, error]);
 
   // ไอคอนสำหรับแต่ละประเภท placeholder
   const getPlaceholderIcon = (placeholder) => {

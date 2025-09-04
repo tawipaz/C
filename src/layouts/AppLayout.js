@@ -1,11 +1,44 @@
 // src/layouts/AppLayout.js
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, UsersRound, CalendarCheck2, MessagesSquare, CircleUserRound,
-  ShieldCheck, ClipboardList, Bell, X, ShieldAlert, Dot, Settings, Menu, ChevronLeft, ChevronRight, Building
+  ShieldCheck, ClipboardList, Bell, X, ShieldAlert, Dot, Settings, Menu, ChevronLeft, ChevronRight,
+  User, ChevronDown, LogOut
 } from "lucide-react";
 import logo from "../assets/logo.png";
+
+// Custom styles for animations
+const customStyles = `
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes textShimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  .text-shimmer {
+    background: linear-gradient(90deg, #ffffff 25%, #e3f2fd 50%, #ffffff 75%);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: textShimmer 2s linear infinite;
+  }
+`;
 
 export default function AppLayout({
   user,
@@ -16,7 +49,9 @@ export default function AppLayout({
   const [showMobileSettings, setShowMobileSettings] = useState(false);
   const [screenSize, setScreenSize] = useState('mobile');
   const [isHovered, setIsHovered] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
 
   // ปรับปรุงการตรวจจับขนาดหน้าจอ
@@ -58,10 +93,26 @@ export default function AppLayout({
     return () => window.removeEventListener('resize', handleResize);
   }, [handleResize]);
 
+  const handleLogout = () => {
+    setDropdownOpen(false);
+    onLogout();
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownOpen && !event.target.closest('.floating-profile')) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [dropdownOpen]);
+
   const navigationItems = [
     { to: "/", key: "home", label: "หน้าหลัก", icon: LayoutDashboard, description: "ภาพรวมระบบ", badge: null },
     { to: "/personnel", key: "personnel", label: "บุคลากร", icon: UsersRound, description: "จัดการเจ้าหน้าที่", badge: null },
-    { to: "/unit-structure", key: "unit-structure", label: "โครงสร้างส่วนงาน", icon: Building, description: "จัดการโครงสร้างองค์กร", badge: null },
     { to: "/document-management", key: "document-management", label: "จัดการเอกสาร", icon: ClipboardList, description: "จัดทำเอกสาร", badge: null },
     { to: "/tasks", key: "tasks", label: "ตารางเวร", icon: CalendarCheck2, description: "จัดตารางงาน", badge: null },
     { to: "/chat", key: "chat", label: "แชท", icon: MessagesSquare, description: "สื่อสารทีม", badge: null },
@@ -87,18 +138,20 @@ export default function AppLayout({
     const sidebarWidth = isHovered ? '280px' : '100px'; // เพิ่มความกว้างขั้นต่ำ
     
     return (
-      <div 
-        className="flex bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden" 
-        style={{ 
-          width: '100vw', 
-          height: '100vh',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          margin: 0,
-          padding: 0
-        }}
-      >
+      <>
+        <style>{customStyles}</style>
+        <div 
+          className="flex bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden" 
+          style={{ 
+            width: '100vw', 
+            height: '100vh',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            margin: 0,
+            padding: 0
+          }}
+        >
         {/* Modern Desktop Sidebar with Hover */}
         <aside 
           className="bg-white shadow-xl border-r border-slate-200/50 flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out relative hover:shadow-2xl"
@@ -108,79 +161,57 @@ export default function AppLayout({
         >
           {/* Sidebar Header */}
           <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-            <div className="p-6 transition-all duration-300">
-              <div className="flex items-center justify-center">
-                <div className="relative">
+            <div className="mx-2 py-4">
+              <div className={`flex items-center h-16 rounded-xl transition-all duration-200 ${!isHovered ? 'justify-center px-3' : 'px-4 space-x-3'}`}>
+                <div className="relative flex-shrink-0 w-12 h-12 flex items-center justify-center">
                   <img 
                     src={logo || "/logo.png"} 
                     alt="Logo" 
-                    className="w-16 h-16 rounded-lg shadow-md object-contain"
+                    className="w-12 h-12 object-contain"
                     onError={(e) => {
                       console.error('Logo failed to load:', e);
                       // Fallback to placeholder
-                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMzNzMzZGMiLz4KPHR5gHFIG4iIGhlaWdodD0iIj4tZmVyOTKU2l6ZT0iMjQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5DPC90ZXh0Pgo8L3N2Zz4=';
+                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiByeD0iOCIgZmlsbD0iIzM3MzNkYyIvPgo8dGV4dCB4PSIyNCIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkM8L3RleHQ+Cjwvc3ZnPg==';
                     }}
                   />
                 </div>
-              </div>
-              <div className={`mt-3 text-center transition-all duration-300 ${!isHovered ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
-                <h1 className="text-lg font-bold">{appName}</h1>
-                <p className="text-sm text-blue-200 opacity-90">ระบบบริหารจัดการ</p>
+                <div className={`flex-1 min-w-0 transition-all duration-300 ${!isHovered ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
+                  <div className="font-bold text-sm leading-tight">
+                    <span className="text-shimmer">
+                      CourtMarshal
+                    </span>
+                    <br />
+                    <span className="text-shimmer" style={{ animationDelay: '0.5s' }}>
+                      Connect
+                    </span>
+                  </div>
+                  <div className="text-xs opacity-80 mt-1 animate-fade-in-up">
+                    <span className="inline-block hover:scale-110 transition-transform duration-200">ระบบ</span>
+                    <span className="inline-block hover:scale-110 transition-transform duration-200 delay-75">บริหาร</span>
+                    <span className="inline-block hover:scale-110 transition-transform duration-200 delay-150">จัดการ</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* User Profile Section - แสดงเฉพาะเมื่อ hover */}
-          {isHovered && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200 transition-all duration-300">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
-                  <CircleUserRound className="w-6 h-6 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800 truncate">
-                    {`${user?.prefix || ''} ${user?.firstname || ''} ${user?.lastname || ''}`.trim()}
-                  </h3>
-                  <p className="text-xs text-slate-500 truncate">{user?.position || "เจ้าหน้าที่"}</p>
-                  {user?.role === 'admin' && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
-                      <ShieldCheck className="w-3 h-3 mr-1" />
-                      Admin
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Collapsed User Avatar - แสดงเฉพาะเมื่อไม่ hover */}
-          {!isHovered && (
-            <div className="p-4 border-b border-slate-200 flex justify-center transition-all duration-300">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
-                <CircleUserRound className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          )}
 
           {/* Navigation Menu */}
           <nav className="py-4 space-y-1 flex-1 overflow-y-auto">
             {navigationItems.map((item, index) => (
               <div
                 key={item.key}
-                className={`group transition-all duration-200 relative ${
-                  !isHovered ? 'flex justify-center py-3' : ''
-                }`}
+                className="group transition-all duration-200 relative mx-2"
               >
                 <Link
                   to={item.to}
-                  className={`flex items-center rounded-xl transition-all duration-200 relative ${
+                  className={`flex items-center rounded-xl transition-all duration-200 relative h-12 ${
                     isActive(item.to)
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                  } ${!isHovered ? 'p-3' : 'px-4 py-3 mx-2 space-x-3'}`}
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                  } ${!isHovered ? 'justify-center px-3' : 'px-4 space-x-3'}`}
                   title={!isHovered ? item.label : ''}
                 >
-                  <div className="relative flex-shrink-0">
+                  <div className="relative flex-shrink-0 w-12 h-12 flex items-center justify-center">
                     <item.icon className="w-6 h-6" />
                     {item.badge && (
                       <div className="absolute -top-2 -right-2 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
@@ -206,24 +237,22 @@ export default function AppLayout({
                 }`}>
                   {!isHovered ? '•••' : 'ผู้ดูแลระบบ'}
                 </div>
-                <div className={`group transition-all duration-200 relative ${
-                  !isHovered ? 'flex justify-center py-3' : ''
-                }`}>
+                <div className="group transition-all duration-200 relative mx-2">
                   <Link
                     to="/admin"
-                    className={`flex items-center rounded-xl transition-all duration-200 relative ${
+                    className={`flex items-center rounded-xl transition-all duration-200 relative h-12 ${
                       isActive('/admin')
                         ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg'
                         : 'text-slate-600 hover:bg-red-50 hover:text-red-600'
-                    } ${!isHovered ? 'p-3' : 'px-4 py-3 mx-2 space-x-3'}`}
+                    } ${!isHovered ? 'justify-center px-3' : 'px-4 space-x-3'}`}
                     title={!isHovered ? 'แผงควบคุม' : ''}
                   >
-                    <div className="relative flex-shrink-0">
+                    <div className="relative flex-shrink-0 w-12 h-12 flex items-center justify-center">
                       <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div className={`flex-1 min-w-0 transition-all duration-300 ${!isHovered ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
                       <div className="font-medium text-sm">แผงควบคุม</div>
-                      <div className="text-xs opacity-60">จัดการระบบ</div>
+                      <div className="text-xs opacity-60 truncate">จัดการระบบ</div>
                     </div>
                   </Link>
                 </div>
@@ -233,24 +262,8 @@ export default function AppLayout({
 
           {/* Sidebar Footer */}
           <div className="border-t border-slate-200">
-            <div className="py-2">
-              <div className={`transition-all duration-200 ${
-                !isHovered ? 'flex justify-center py-3' : ''
-              }`}>
-                <Link
-                  to="/settings"
-                  className={`flex items-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors ${
-                    !isHovered ? 'p-3' : 'px-4 py-2 mx-2 space-x-2'
-                  }`}
-                  title={!isHovered ? "ตั้งค่า" : ''}
-                >
-                  <Settings className="w-6 h-6" />
-                  <span className={`text-sm transition-all duration-300 ${!isHovered ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>ตั้งค่า</span>
-                </Link>
-              </div>
-            </div>
             {isHovered && (
-              <div className="px-4 pb-4 transition-all duration-300">
+              <div className="mx-2 py-2 transition-all duration-300">
                 <button
                   onClick={onLogout}
                   className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -271,6 +284,77 @@ export default function AppLayout({
             overflow: 'hidden'
           }}
         >
+          {/* Floating Profile and Settings */}
+          <div className="fixed top-4 right-4 z-50 flex items-center space-x-3">
+            {/* Settings Button */}
+            <button 
+              onClick={() => navigate('/settings')}
+              className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 hover:border-blue-300 group"
+            >
+              <Settings className="w-6 h-6 text-gray-600 group-hover:text-blue-600 transition-colors" />
+            </button>
+            
+            {/* User Profile */}
+            <div className="relative floating-profile">
+              <button 
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center space-x-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 p-2 border border-gray-200 hover:border-blue-300"
+              >
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  {user?.fullName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+                <div className="text-left pr-2">
+                  <div className="text-sm font-medium text-gray-900 max-w-32 truncate">
+                    {user?.fullName || user?.email || 'ผู้ใช้'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {user?.role || 'User'}
+                  </div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {user?.fullName || user?.email || 'ผู้ใช้'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {user?.email}
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => navigate('/profile')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  >
+                    <User className="w-4 h-4 mr-3" />
+                    โปรไฟล์
+                  </button>
+                  
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  >
+                    <Settings className="w-4 h-4 mr-3" />
+                    การตั้งค่า
+                  </button>
+                  
+                  <div className="border-t border-gray-100 my-1"></div>
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                  >
+                    <LogOut className="w-4 h-4 mr-3" />
+                    ออกจากระบบ
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <main 
             className="overflow-auto bg-gradient-to-br from-slate-50 to-slate-100"
             style={{ 
@@ -283,7 +367,8 @@ export default function AppLayout({
             </div>
           </main>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 

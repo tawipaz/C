@@ -1,310 +1,217 @@
-import React, { useState, useMemo, useCallback, memo, useEffect } from "react";
-import {
-  Calendar as CalendarIcon,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Search,
-  Edit,
-  Trash2,
-  Save,
-  X,
-  Clock,
-  Users,
-  Building,
-  FileText,
-  Settings,
-  Sun, Moon,
-  File,
-  Shield,
-  CloudSun,
-  Target,
-  UserPlus,
-  Star,
+import React, { useState, useEffect, useMemo, memo } from 'react';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar, 
+  Filter, 
+  Plus, 
+  Shield, 
+  Save, 
+  Edit, 
+  Trash2, 
+  Search, 
+  X, 
+  Moon, 
+  Sun, 
+  Users, 
+  Briefcase,
   Crown,
-  User,
-  ChevronDown
+  Star,
+  User
 } from 'lucide-react';
 import { CONFIG } from '../config';
+import UnitStructureManagement from '../components/UnitStructure/UnitStructureManagement';
 
-// --- ฟังก์ชันตรวจสอบวันหยุด ---
-const isHoliday = (date, holidays = []) => {
-  if (!date) return false;
-  const dayOfWeek = date.getDay();
-  if (dayOfWeek === 0 || dayOfWeek === 6) return true;
-  const dateStr = date.toISOString().split('T')[0];
-  return holidays.some(holiday => holiday.holiday_date === dateStr);
-};
+// Helper functions
+const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+const isToday = (date, today) => date.toDateString() === today.toDateString();
+const isSameDay = (date1, date2) => date1.toDateString() === date2.toDateString();
+const isHoliday = (date, holidays) => holidays.some(holiday => isSameDay(new Date(holiday.date + 'T00:00:00'), date));
+const getShiftTypeByPeriod = (period, isHolidayDate, shiftTypes) => shiftTypes.find(st => st.type_name === (period === 'day' ? (isHolidayDate ? 'วันหยุด (กลางวัน)' : 'ปกติ (กลางวัน)') : 'ปกติ (กลางคืน)'));
 
-const isToday = (date) => {
-  if (!date) return false;
-  const today = new Date();
-  return date.getDate() === today.getDate() &&
-         date.getMonth() === today.getMonth() &&
-         date.getFullYear() === today.getFullYear();
-};
-
-// --- ฟังก์ชันหา shift_type ตาม period และ holiday ---
-const getShiftTypeByPeriod = (period, isHolidayDate, shiftTypes) => {
-  if (!Array.isArray(shiftTypes)) return null;
-  if (period === 'night') {
-    return shiftTypes.find(type => type.id === 2 || type.id === 4);
-  } else {
-    return isHolidayDate 
-      ? shiftTypes.find(type => type.id === 3)
-      : shiftTypes.find(type => type.id === 1);
+const getRoleIcon = (role) => {
+  switch (role) {
+    case 'director': return <Crown className="w-4 h-4 text-purple-600" />;
+    case 'supervisor': return <Star className="w-4 h-4 text-blue-600" />;
+    default: return <User className="w-4 h-4 text-green-600" />;
   }
 };
 
-// --- Redesigned Calendar Components ---
+const getRoleLabel = (role) => {
+  switch (role) {
+    case 'director': return 'ผู้อำนวยการ';
+    case 'supervisor': return 'หัวหน้าส่วน';
+    default: return 'เจ้าหน้าที่';
+  }
+};
 
-const ShiftCalendarView = memo(({
-  currentDate,
-  schedules,
-  holidays,
-  filters,
-  setFilters,
-  units,
-  navigateMonth,
-  goToToday,
-  openAddModal,
-  openEditModal
-}) => {
+const getRoleBadgeClass = (role) => {
+  switch (role) {
+    case 'director': return 'bg-purple-100 text-purple-700';
+    case 'supervisor': return 'bg-blue-100 text-blue-700';
+    default: return 'bg-green-100 text-green-700';
+  }
+};
 
-  const days = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    const daysArray = [];
-    
-    // Add blank days for the start of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      daysArray.push(null);
-    }
-    
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      daysArray.push(new Date(year, month, day));
-    }
-
-    // Add blank days to complete the grid
-    while (daysArray.length % 7 !== 0) {
-      daysArray.push(null);
-    }
-
-    return daysArray;
-  }, [currentDate]);
-
-  const getSchedulesForDate = useCallback((date) => {
-    if (!date) return [];
-    const dateStr = date.toISOString().split('T')[0];
-    return schedules.filter(schedule => schedule.duty_date === dateStr);
-  }, [schedules]);
+const CalendarDayCell = memo(({ date, holidays, schedules, onAdd, onEdit }) => {
+  const today = new Date();
+  const isHolidayDate = isHoliday(date, holidays);
+  const daySchedules = schedules.filter(schedule => isSameDay(new Date(schedule.duty_date + 'T00:00:00'), date));
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 h-full flex flex-col">
-      <CalendarHeader 
-        currentDate={currentDate}
-        navigateMonth={navigateMonth}
-        goToToday={goToToday}
-        openAddModal={openAddModal}
-      />
-      <CalendarFilters 
-        filters={filters}
-        setFilters={setFilters}
-        units={units}
-      />
-      <div className="flex-grow mt-4 flex flex-col">
-        <div className="grid grid-cols-7 border-t border-l border-slate-200">
+    <div 
+      className={`min-h-[120px] border border-slate-200 p-1 cursor-pointer hover:bg-slate-50 ${
+        isToday(date, today) ? 'bg-indigo-50 border-indigo-300' : ''
+      } ${isHolidayDate ? 'bg-red-50' : ''}`}
+      onClick={() => onAdd(date)}
+    >
+      <div className="flex justify-between items-start mb-1">
+        <span className={`text-sm font-medium ${
+          isToday(date, today) ? 'text-indigo-600' : 
+          isHolidayDate ? 'text-red-600' : 'text-slate-700'
+        }`}>
+          {date.getDate()}
+        </span>
+        {isHolidayDate && <span className="text-xs text-red-500">หยุด</span>}
+      </div>
+      
+      <div className="space-y-1">
+        {daySchedules.map(schedule => (
+          <ScheduleItem key={schedule.id} schedule={schedule} onEdit={onEdit} />
+        ))}
+      </div>
+    </div>
+  );
+});
+
+const ScheduleItem = memo(({ schedule, onEdit }) => (
+  <div 
+    className="text-xs p-1 bg-indigo-100 text-indigo-800 rounded truncate cursor-pointer hover:bg-indigo-200"
+    onClick={(e) => { e.stopPropagation(); onEdit(schedule); }}
+    title={`${schedule.shift_type_name} - ${schedule.officer_names || 'ไม่ระบุเจ้าหน้าที่'} ${schedule.notes ? `(${schedule.notes})` : ''}`}
+  >
+    {schedule.shift_type_name} - {schedule.officer_names || 'ไม่ระบุ'}
+  </div>
+));
+
+const ShiftCalendarView = ({ 
+  currentDate, 
+  schedules, 
+  officers, 
+  shiftTypes, 
+  units, 
+  holidays, 
+  filters, 
+  setFilters, 
+  navigateMonth, 
+  goToToday, 
+  openAddModal, 
+  openEditModal 
+}) => {
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDay = getFirstDayOfMonth(currentDate);
+  const today = new Date();
+  
+  const monthDays = useMemo(() => {
+    const days = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
+    }
+    return days;
+  }, [currentDate, daysInMonth]);
+
+  const emptyDays = Array.from({ length: firstDay }, (_, i) => i);
+
+  return (
+    <div className="space-y-4">
+      {/* Calendar Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => navigateMonth(-1)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-semibold text-slate-800 min-w-[200px] text-center">
+              {currentDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}
+            </h2>
+            <button 
+              onClick={() => navigateMonth(1)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+          <button 
+            onClick={goToToday}
+            className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            วันนี้
+          </button>
+        </div>
+        
+        {/* Filters */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <select 
+              value={filters.unit}
+              onChange={(e) => setFilters(prev => ({ ...prev, unit: e.target.value }))}
+              className="text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">ทุกส่วนงาน</option>
+              {units.map(unit => (
+                <option key={unit.id} value={unit.id}>{unit.unit_name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="ค้นหาเจ้าหน้าที่..."
+              value={filters.officer}
+              onChange={(e) => setFilters(prev => ({ ...prev, officer: e.target.value }))}
+              className="pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        {/* Days of week header */}
+        <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
           {['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'].map(day => (
-            <div key={day} className="p-3 text-center text-xs font-semibold text-slate-500 border-b border-r border-slate-200 bg-slate-50">
+            <div key={day} className="p-3 text-center text-sm font-medium text-slate-600">
               {day}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 grid-rows-6 flex-grow border-l border-slate-200">
-          {days.map((date, index) => (
+        
+        {/* Calendar body */}
+        <div className="grid grid-cols-7">
+          {/* Empty cells for days before month starts */}
+          {emptyDays.map(day => (
+            <div key={`empty-${day}`} className="min-h-[120px] border border-slate-200 bg-slate-50"></div>
+          ))}
+          
+          {/* Month days */}
+          {monthDays.map(date => (
             <CalendarDayCell
-              key={date ? date.toISOString() : `empty-${index}`}
+              key={date.toISOString()}
               date={date}
               holidays={holidays}
-              schedules={getSchedulesForDate(date)}
-              onAdd={() => openAddModal(date)}
+              schedules={schedules}
+              onAdd={openAddModal}
               onEdit={openEditModal}
             />
           ))}
         </div>
-      </div>
-    </div>
-  );
-});
-
-const CalendarHeader = memo(({ currentDate, navigateMonth, goToToday, openAddModal }) => (
-  <div className="flex items-center justify-between mb-4">
-    <div className="flex items-center space-x-2">
-      <button onClick={() => navigateMonth(-1)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full">
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <h2 className="text-xl font-semibold text-slate-800 text-center w-48">
-        {currentDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
-      </h2>
-      <button onClick={() => navigateMonth(1)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full">
-        <ChevronRight className="w-5 h-5" />
-      </button>
-    </div>
-    <div className="flex items-center space-x-2">
-      <button onClick={goToToday} className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 rounded-lg">
-        วันนี้
-      </button>
-      <button
-        onClick={() => openAddModal()}
-        className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        เพิ่มเวร
-      </button>
-    </div>
-  </div>
-));
-
-const CalendarFilters = memo(({ filters, setFilters, units }) => (
-  <div className="flex items-center space-x-4">
-    <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-      <input
-        type="text"
-        placeholder="ค้นหาเจ้าหน้าที่..."
-        value={filters.officer}
-        onChange={(e) => setFilters(prev => ({ ...prev, officer: e.target.value }))}
-        className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-      />
-    </div>
-    <div className="relative">
-      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-      <select
-        value={filters.unit}
-        onChange={(e) => setFilters(prev => ({ ...prev, unit: e.target.value }))}
-        className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm appearance-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-      >
-        <option value="">ทุกส่วนงาน</option>
-        {Array.isArray(units) && units.map(unit => (
-          <option key={unit.id} value={unit.id}>{unit.unit_name}</option>
-        ))}
-      </select>
-    </div>
-  </div>
-));
-
-const CalendarDayCell = memo(({ date, holidays, schedules, onAdd, onEdit }) => {
-  if (!date) return <div className="border-b border-r border-slate-200 bg-slate-50/50"></div>;
-
-  const today = isToday(date);
-  const holiday = isHoliday(date, holidays);
-
-  return (
-    <div className="relative p-2 border-b border-r border-slate-200 flex flex-col group">
-      <div className="flex items-center space-x-2 mb-2">
-        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-semibold ${today ? 'bg-indigo-600 text-white' : holiday ? 'text-red-600' : 'text-slate-700'}`}>
-          {date.getDate()}
-        </span>
-        {holiday && !today && <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>}
-      </div>
-      <div className="flex-1 space-y-1 overflow-y-auto">
-        {schedules.map(schedule => <ScheduleItem key={schedule.id} schedule={schedule} onEdit={onEdit} />)}
-      </div>
-      <button onClick={onAdd} className="absolute bottom-1 right-1 w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full opacity-0 group-hover:opacity-100 hover:bg-indigo-100 hover:text-indigo-600 transition-opacity">
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  );
-});
-
-const ScheduleItem = memo(({ schedule, onEdit }) => {
-  const shiftColors = {
-    1: 'border-yellow-500', // เวรปกติ
-    3: 'border-orange-500', // เวรวันหยุด
-    2: 'border-indigo-500', // เวรกลางคืน
-    4: 'border-indigo-500', // เวรกลางคืน
-    default: 'border-slate-400'
-  };
-  const borderColor = shiftColors[schedule.shift_type_id] || shiftColors.default;
-
-  return (
-    <div 
-      onClick={() => onEdit(schedule)}
-      className={`p-1.5 rounded-md bg-slate-50 hover:bg-slate-100 cursor-pointer border-l-4 ${borderColor}`}
-    >
-      <p className="text-xs font-semibold text-slate-800 truncate">{schedule.shift_type_name}</p>
-      <p className="text-xs text-slate-600 truncate">{schedule.officer_names}</p>
-    </div>
-  );
-});
-
-const DocumentManagementView = () => {
-  const documents = [
-    {
-      title: "เวรในเวลาราชการ",
-      description: "จัดทำเอกสารสำหรับเวรปกติ",
-      icon: Sun,
-      color: "bg-yellow-500",
-      action: () => alert('Creating In-hours Document...')
-    },
-    {
-      title: "เวรนอกเวลา (กลางวัน)",
-      description: "สำหรับเวรวันหยุดและนักขัตฤกษ์",
-      icon: CloudSun,
-      color: "bg-orange-500",
-      action: () => alert('Creating Off-hours (Day) Document...')
-    },
-    {
-      title: "เวรนอกเวลา (กลางคืน)",
-      description: "สำหรับเวรช่วงเวลากลางคืน",
-      icon: Moon,
-      color: "bg-indigo-600",
-      action: () => alert('Creating Off-hours (Night) Document...')
-    },
-    {
-      title: "ขออนุญาตพกพาอาวุธ",
-      description: "จัดทำเอกสารขออนุญาตพกพาอาวุธปืน",
-      icon: Target,
-      color: "bg-red-600",
-      action: () => alert('Creating Firearm Permit Document...')
-    },
-    {
-      title: "รายงานประจำสัปดาห์",
-      description: "สรุปผลการปฏิบัติงานรายสัปดาห์",
-      icon: FileText,
-      color: "bg-green-600",
-      action: () => alert('Creating Weekly Report...')
-    }
-  ];
-
-  return (
-    <div className="p-6 bg-slate-50 rounded-2xl">
-      <div className="text-center mb-12">
-        <h2 className="text-2xl font-bold text-slate-800">เลือกประเภทเอกสาร</h2>
-        <p className="text-slate-500 mt-2">เลือกเอกสารที่ต้องการจัดทำจากรายการด้านล่าง</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
-        {documents.map((doc, index) => (
-          <button 
-            key={index} 
-            onClick={doc.action}
-            className="group relative flex flex-col items-center justify-center text-center p-6 bg-white rounded-2xl shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 ease-in-out border-b-4 border-transparent hover:border-indigo-500"
-          >
-            <div className={`absolute -top-8 flex items-center justify-center w-20 h-20 rounded-full ${doc.color} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-              <doc.icon className="w-10 h-10 text-white" />
-            </div>
-            <div className="mt-12">
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">{doc.title}</h3>
-              <p className="text-sm text-slate-500">{doc.description}</p>
-            </div>
-          </button>
-        ))}
       </div>
     </div>
   );
@@ -336,15 +243,21 @@ const ShiftWorkPage = () => {
       try {
         const response = await fetch(`${CONFIG.SCHEDULES_API}?action=get_holidays&year=${currentDate.getFullYear()}`);
         const result = await response.json();
-        if (!result.success) throw new Error(result.message);
-        setHolidays(result.data);
+        if (result.success && Array.isArray(result.data)) {
+          setHolidays(result.data);
+        } else {
+          console.warn('No holidays data available');
+          setHolidays([]);
+        }
       } catch (error) {
         console.error("ล้มเหลวในการดึงข้อมูลวันหยุด:", error);
+        setHolidays([]);
       }
     };
 
     loadHolidaysByYear();
   }, [currentDate]);
+
   useEffect(() => {
     if (selectedUnits.length > 0 && Array.isArray(officers)) {
       const officersInSelectedUnits = officers
@@ -643,8 +556,8 @@ const ShiftWorkPage = () => {
                     activeTab === 'documents' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-slate-500 hover:text-slate-700'
               }`}
           >
-            <File className="w-4 h-4" />
-            <span>จัดการเอกสาร</span>
+            <Briefcase className="w-4 h-4" />
+            <span>จัดการโครงสร้าง</span>
           </button>
         </nav>
       </div>
@@ -666,7 +579,7 @@ const ShiftWorkPage = () => {
             openEditModal={openEditModal}
           />
         )}
-        {activeTab === 'documents' && <DocumentManagementView />}
+        {activeTab === 'documents' && <UnitStructureManagement />}
       </div>
 
       {(showAddModal || showEditModal) && (
@@ -905,309 +818,6 @@ const ShiftWorkPage = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// Unit Management View Component - เลือกการ์ดส่วนงานแล้วจัดการบุคลากร
-const UnitManagementView = ({
-  dutyUnits,
-  unitStructures,
-  onEdit,
-  onDelete,
-  onAdd,
-  onEditDutyUnit,
-  onDeleteDutyUnit,
-  onAddDutyUnit,
-  getRoleIcon,
-  getRoleLabel,
-  getRoleBadgeClass
-}) => {
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
-  const [personnelAction, setPersonnelAction] = useState(''); // 'add', 'setSupervisor'
-
-  // Get unit statistics
-  const getUnitStats = (unitCode) => {
-    const unitPersonnel = unitStructures.filter(item => item.unit_code === unitCode);
-    const supervisor = unitPersonnel.find(item => item.role === 'supervisor');
-    const members = unitPersonnel.filter(item => item.role === 'member');
-    const director = unitPersonnel.find(item => item.role === 'director');
-    
-    return {
-      total: unitPersonnel.length,
-      supervisor,
-      members,
-      director,
-      hasSupervisor: !!supervisor,
-      hasDirector: !!director
-    };
-  };
-
-  const handleUnitSelect = (unit) => {
-    setSelectedUnit(unit);
-  };
-
-  const handleAddPersonnel = () => {
-    if (!selectedUnit) return;
-    
-    const stats = getUnitStats(selectedUnit.unit_code);
-    const nextSeniorityOrder = stats.total + 1;
-    
-    // เปิด modal พร้อมกำหนดค่าเริ่มต้น
-    onAdd({
-      unit_code: selectedUnit.unit_code,
-      role: selectedUnit.unit_code === 'CS08' ? 'director' : 'member',
-      seniority_order: nextSeniorityOrder
-    });
-  };
-
-  const handleSetSupervisor = () => {
-    if (!selectedUnit) return;
-    
-    // เปิด modal สำหรับกำหนดหัวหน้าส่วน
-    onAdd({
-      unit_code: selectedUnit.unit_code,
-      role: 'supervisor',
-      seniority_order: 1
-    });
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Unit Cards */}
-      <div className="lg:col-span-2">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-800">เลือกส่วนงาน</h2>
-          <button
-            onClick={() => onAddDutyUnit()}
-            className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            เพิ่มส่วนงาน
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {dutyUnits.map((unit) => {
-            const stats = getUnitStats(unit.unit_code);
-            const isSelected = selectedUnit?.unit_code === unit.unit_code;
-            const isDirector = unit.unit_code === 'CS08';
-            
-            return (
-              <div
-                key={unit.unit_code}
-                onClick={() => handleUnitSelect(unit)}
-                className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  isSelected 
-                    ? 'border-indigo-500 bg-indigo-50' 
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                {/* Unit Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-800">{unit.unit_code.toUpperCase()}</h3>
-                    <p className="text-sm text-slate-600">{unit.unit_name}</p>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditDutyUnit(unit);
-                      }}
-                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    {!isDirector && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteDutyUnit(unit);
-                        }}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Unit Status */}
-                <div className="space-y-2 mb-3">
-                  {isDirector ? (
-                    <div className="flex items-center space-x-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span className="text-sm text-slate-600">ผู้อำนวยการศูนย์</span>
-                      {stats.hasDirector && (
-                        <span className="text-sm text-green-600 font-medium">
-                          (มีแล้ว)
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <Shield className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm text-slate-600">หัวหน้าส่วน:</span>
-                      {stats.hasSupervisor ? (
-                        <span className="text-sm text-green-600 font-medium">
-                          {stats.supervisor?.full_name}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-red-500">ยังไม่กำหนด</span>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-600">
-                      บุคลากร: {stats.total} คน
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="pt-2 border-t border-slate-200">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">คลิกเพื่อจัดการ</span>
-                    {isSelected && (
-                      <span className="text-indigo-600 font-medium">เลือกแล้ว</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Selected Unit Management Panel */}
-      <div className="lg:col-span-1">
-        {selectedUnit ? (
-          <div className="bg-slate-50 rounded-lg p-4">
-            <h3 className="font-semibold text-slate-800 mb-4">
-              จัดการ {selectedUnit.unit_code.toUpperCase()}
-            </h3>
-            
-            <div className="space-y-3">
-              {selectedUnit.unit_code === 'CS08' ? (
-                // Director Unit (CS08) - สามารถมีได้เพียง 1 คน
-                <>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Star className="w-4 h-4 text-yellow-600" />
-                      <span className="text-sm font-medium text-yellow-800">ผู้อำนวยการศูนย์</span>
-                    </div>
-                    <p className="text-xs text-yellow-700">
-                      หน่วยงานนี้สามารถมีได้เพียง 1 คนเท่านั้น
-                    </p>
-                  </div>
-                  
-                  <button
-                    onClick={handleAddPersonnel}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>กำหนดผู้อำนวยการ</span>
-                  </button>
-                </>
-              ) : (
-                // Regular Units - สามารถมีได้หลายคน
-                <>
-                  <button
-                    onClick={handleSetSupervisor}
-                    disabled={getUnitStats(selectedUnit.unit_code).hasSupervisor}
-                    className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg ${
-                      getUnitStats(selectedUnit.unit_code).hasSupervisor
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    <Shield className="w-4 h-4" />
-                    <span>
-                      {getUnitStats(selectedUnit.unit_code).hasSupervisor 
-                        ? 'มีหัวหน้าส่วนแล้ว' 
-                        : 'กำหนดหัวหน้าส่วน'
-                      }
-                    </span>
-                  </button>
-                  
-                  <button
-                    onClick={handleAddPersonnel}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>เพิ่มเจ้าหน้าที่</span>
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Current Personnel */}
-            <div className="mt-6">
-              <h4 className="text-sm font-medium text-slate-700 mb-3">บุคลากรปัจจุบัน</h4>
-              <div className="space-y-2">
-                {unitStructures
-                  .filter(item => item.unit_code === selectedUnit.unit_code)
-                  .sort((a, b) => {
-                    // เรียงลำดับ: director > supervisor > member
-                    if (a.role === 'director') return -1;
-                    if (b.role === 'director') return 1;
-                    if (a.role === 'supervisor') return -1;
-                    if (b.role === 'supervisor') return 1;
-                    return a.seniority_order - b.seniority_order;
-                  })
-                  .map((person) => (
-                    <div key={person.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                      <div className="flex items-center space-x-2">
-                        {getRoleIcon(person.role)}
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">
-                            {person.full_name || `ตำแหน่งที่ ${person.position_number}`}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {getRoleLabel(person.role)} • ลำดับ {person.seniority_order}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={() => onEdit(person)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => onDelete(person)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                
-                {unitStructures.filter(item => item.unit_code === selectedUnit.unit_code).length === 0 && (
-                  <div className="text-center py-4 text-slate-500">
-                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">ยังไม่มีบุคลากร</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-slate-50 rounded-lg p-8 text-center">
-            <Building className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-            <h3 className="text-lg font-medium text-slate-600 mb-2">เลือกส่วนงาน</h3>
-            <p className="text-sm text-slate-500">
-              เลือกส่วนงานจากรายการด้านซ้ายเพื่อจัดการบุคลากร
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

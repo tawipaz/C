@@ -4,6 +4,7 @@ import {
   Shield, Users, Edit2, Trash2, Save, Crown, UserCog, Users2, KeyRound
 } from "lucide-react";
 import { CONFIG } from '../config';
+import { useAlert } from '../components/common/AlertSystem';
 
 // --- พจนานุกรมสำหรับแปล Action เป็นภาษาไทย ---
 const ACTION_TRANSLATIONS = {
@@ -25,6 +26,7 @@ const ACTION_TRANSLATIONS = {
 
 // --- Component: User Approval Section ---
 const UserApproval = ({ user }) => {
+  const { error } = useAlert();
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -66,7 +68,7 @@ const UserApproval = ({ user }) => {
       if (data.success) {
         fetchPendingUsers();
       } else {
-        alert(`Error: ${data.message}`);
+        error(`Error: ${data.message}`);
       }
     } catch (error) {
       console.error("Error updating user status:", error);
@@ -115,6 +117,7 @@ const UserApproval = ({ user }) => {
 
 // --- Component: Personnel Management Section ---
 const PersonnelManagement = ({ user }) => {
+  const { success, error } = useAlert();
   const [allOfficers, setAllOfficers] = useState([]); // Holds all users from API
   const [officers, setOfficers] = useState([]); // Holds filtered users for display
   const [loading, setLoading] = useState(true);
@@ -211,13 +214,13 @@ const PersonnelManagement = ({ user }) => {
       if (data.success) {
         fetchAllOfficers();
         setEditingOfficer(null);
-        alert('อัปเดตข้อมูลสำเร็จ');
+        success('อัปเดตข้อมูลสำเร็จ');
       } else {
         throw new Error(data.message || 'ไม่สามารถอัปเดตได้');
       }
-    } catch (error) {
-      console.error("Error updating officer:", error);
-      alert(`เกิดข้อผิดพลาดในการอัปเดตข้อมูล: ${error.message}`);
+    } catch (err) {
+      console.error("Error updating officer:", err);
+      error(`เกิดข้อผิดพลาดในการอัปเดตข้อมูล: ${err.message}`);
     }
   };
 
@@ -232,13 +235,13 @@ const PersonnelManagement = ({ user }) => {
       const data = await response.json();
       if (data.success) {
         fetchAllOfficers();
-        alert('ลบข้อมูลสำเร็จ');
+        success('ลบข้อมูลสำเร็จ');
       } else {
         throw new Error(data.message || 'ไม่สามารถลบข้อมูลได้');
       }
-    } catch (error) {
-      console.error("Error deleting officer:", error);
-      alert(`เกิดข้อผิดพลาดในการลบข้อมูล: ${error.message}`);
+    } catch (err) {
+      console.error("Error deleting officer:", err);
+      error(`เกิดข้อผิดพลาดในการลบข้อมูล: ${err.message}`);
     }
   };
 
@@ -513,6 +516,7 @@ const EditOfficerForm = ({ officer, onSave, onCancel }) => {
 
 // --- Component: Activity Logs Section ---
 const ActivityLogs = () => {
+  const { warning } = useAlert();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ search: "", startDate: "", endDate: "" });
@@ -546,7 +550,7 @@ const ActivityLogs = () => {
   }, [fetchLogs]);
   
   const exportToCSV = useCallback(() => {
-    if (logs.length === 0) return alert('ไม่มีข้อมูลสำหรับ Export');
+    if (logs.length === 0) return warning('ไม่มีข้อมูลสำหรับ Export');
     const headers = ['เวลา', 'ผู้ใช้งาน', 'กิจกรรม', 'รายละเอียด', 'IP Address'];
     const rows = logs.map(log => [
         log.timestamp,
@@ -613,6 +617,7 @@ const ActivityLogs = () => {
 
 // --- Component: Database Manager (Admin) ---
 const DatabaseManager = ({ user }) => {
+  const { warning, error } = useAlert();
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -640,7 +645,7 @@ const DatabaseManager = ({ user }) => {
   useEffect(() => { fetchTables(); }, [fetchTables]);
 
   const handleCreateTable = async () => {
-    if (!newTableName.trim()) return alert('กรุณาระบุชื่อฐานข้อมูล (table name)');
+    if (!newTableName.trim()) return warning('กรุณาระบุชื่อฐานข้อมูล (table name)');
     try {
       const res = await fetch(`${apiBase}/admin/db/tables`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -648,8 +653,8 @@ const DatabaseManager = ({ user }) => {
       });
       const d = await res.json();
       if (d.success) { setNewTableName(''); fetchTables(); }
-      else alert(d.message || 'ไม่สามารถสร้างตารางได้');
-    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+      else error(d.message || 'ไม่สามารถสร้างตารางได้');
+    } catch (err) { console.error(err); error('เกิดข้อผิดพลาด'); }
   };
 
   const handleDropTable = async (table) => {
@@ -657,12 +662,12 @@ const DatabaseManager = ({ user }) => {
     try {
       const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}`, { method: 'DELETE' });
       const d = await res.json();
-      if (d.success) fetchTables(); else alert(d.message || 'ลบไม่สำเร็จ');
-    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+      if (d.success) fetchTables(); else error(d.message || 'ลบไม่สำเร็จ');
+    } catch (err) { console.error(err); error('เกิดข้อผิดพลาด'); }
   };
 
   const handleAddColumn = async (table) => {
-    if (!newColumnName.trim()) return alert('กรุณาระบุชื่อคอลัมน์');
+    if (!newColumnName.trim()) return warning('กรุณาระบุชื่อคอลัมน์');
     try {
       const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}/columns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -670,8 +675,8 @@ const DatabaseManager = ({ user }) => {
       });
       const d = await res.json();
       if (d.success) { setNewColumnName(''); setNewColumnType('text'); fetchTables(); }
-      else alert(d.message || 'ไม่สามารถเพิ่มคอลัมน์ได้');
-    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+      else error(d.message || 'ไม่สามารถเพิ่มคอลัมน์ได้');
+    } catch (err) { console.error(err); error('เกิดข้อผิดพลาด'); }
   };
 
   const handleDropColumn = async (table, column) => {
@@ -679,8 +684,8 @@ const DatabaseManager = ({ user }) => {
     try {
       const res = await fetch(`${apiBase}/admin/db/tables/${encodeURIComponent(table)}/columns/${encodeURIComponent(column)}`, { method: 'DELETE' });
       const d = await res.json();
-      if (d.success) fetchTables(); else alert(d.message || 'ลบคอลัมน์ไม่สำเร็จ');
-    } catch (err) { console.error(err); alert('เกิดข้อผิดพลาด'); }
+      if (d.success) fetchTables(); else error(d.message || 'ลบคอลัมน์ไม่สำเร็จ');
+    } catch (err) { console.error(err); error('เกิดข้อผิดพลาด'); }
   };
 
   return (
@@ -766,6 +771,7 @@ const DatabaseManager = ({ user }) => {
 
 // --- Main Component: AdminPage ---
 export default function AdminPage({ user }) {
+  const { success, error, warning } = useAlert();
     const allTabs = [
       { key: 'approval', label: 'คำขออนุมัติ', icon: UserCheck, component: <UserApproval user={user} />, roles: ['super_admin', 'admin'] },
       { key: 'personnel', label: 'จัดการบุคลากร', icon: Users2, component: <PersonnelManagement user={user} />, roles: ['super_admin', 'admin'] },

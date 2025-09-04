@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Circle } from 'react-l
 import { ArrowLeft, Siren, Shield, ShieldCheck, ShieldX, MapPin, Map as MapIcon, X } from 'lucide-react';
 import L from 'leaflet';
 import ReactDOMServer from 'react-dom/server';
+import { useAlert } from '../components/common/AlertSystem';
 
 // --- Helper Functions ---
 
@@ -177,6 +178,7 @@ const MapView = memo(({ userLocation, checkpoints, area, areaStyle, radius, onCl
 // --- Main Component ---
 
 const OnDutyPage = () => {
+  const { success } = useAlert();
   const [userLocation, setUserLocation] = useState(null);
   const [checkpoints, setCheckpoints] = useState(() => 
     initialCheckpoints.map(p => ({ ...p, status: 'too_far', distance: null }))
@@ -225,7 +227,7 @@ const OnDutyPage = () => {
   };
 
   const handleGoBack = () => window.history.back();
-  const handleSOS = () => alert("ส่งคำขอความช่วยเหลือฉุกเฉินแล้ว! เจ้าหน้าที่กำลังไปที่ตำแหน่งของคุณ");
+  const handleSOS = () => success("ส่งคำขอความช่วยเหลือฉุกเฉินแล้ว! เจ้าหน้าที่กำลังไปที่ตำแหน่งของคุณ", "SOS");
 
   return (
     <div className="fixed inset-0 bg-slate-50 z-[1000] flex flex-col">

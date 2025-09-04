@@ -283,17 +283,13 @@ const TreemapChart = memo(({ title, data, colors = [] }) => {
   );
 });
 
-// Pie Chart Component - เปลี่ยนเป็น Donut Chart
+// Pie Chart Component - ปรับปรุงให้สวยงาม
 const PieChartComponent = memo(({ title, data, colors = [] }) => {
   const total = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
   
   if (!data.length || total === 0) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-          <PieChart className="w-5 h-5 mr-2 text-slate-400" />
-          {title}
-        </h3>
+      <div className="h-full flex items-center justify-center">
         <div className="text-center py-8">
           <p className="text-slate-500">ไม่มีข้อมูลสำหรับแสดงกราฟ</p>
         </div>
@@ -302,125 +298,111 @@ const PieChartComponent = memo(({ title, data, colors = [] }) => {
   }
   
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 h-fit">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-slate-900 flex items-center">
-          <PieChart className="w-5 h-5 mr-2 text-slate-400" />
-          {title}
-        </h3>
-        <div className="text-right">
-          <div className="text-lg font-bold text-slate-900">จำนวน {total} คน</div>
-        </div>
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-center mb-6">
+        <div className="text-xl font-bold text-slate-900">จำนวน {total} คน</div>
       </div>
       
-      <div className="relative border border-slate-200 rounded-lg p-4 bg-slate-50">
-        <div className="flex flex-col items-center">
-          {/* Donut Chart */}
-          <div className="relative w-48 h-48">
-            <svg width="192" height="192" viewBox="0 0 192 192" className="w-full h-full">
-              {data.map((item, index) => {
-                const percentage = item.value / total;
-                const angle = percentage * 360;
-                
-                const prevPercentage = data.slice(0, index).reduce((sum, d) => sum + d.value, 0) / total;
-                const startAngle = prevPercentage * 360 - 90;
-                const endAngle = startAngle + angle;
-                
-                // Donut chart - outer radius 80, inner radius 45
-                const outerRadius = 80;
-                const innerRadius = 45;
-                
-                const startXOuter = 96 + outerRadius * Math.cos((startAngle * Math.PI) / 180);
-                const startYOuter = 96 + outerRadius * Math.sin((startAngle * Math.PI) / 180);
-                const endXOuter = 96 + outerRadius * Math.cos((endAngle * Math.PI) / 180);
-                const endYOuter = 96 + outerRadius * Math.sin((endAngle * Math.PI) / 180);
-                
-                const startXInner = 96 + innerRadius * Math.cos((endAngle * Math.PI) / 180);
-                const startYInner = 96 + innerRadius * Math.sin((endAngle * Math.PI) / 180);
-                const endXInner = 96 + innerRadius * Math.cos((startAngle * Math.PI) / 180);
-                const endYInner = 96 + innerRadius * Math.sin((startAngle * Math.PI) / 180);
-                
-                const largeArcFlag = angle > 180 ? 1 : 0;
-                
-                const pathData = [
-                  'M', startXOuter, startYOuter,
-                  'A', outerRadius, outerRadius, 0, largeArcFlag, 1, endXOuter, endYOuter,
-                  'L', startXInner, startYInner,
-                  'A', innerRadius, innerRadius, 0, largeArcFlag, 0, endXInner, endYInner,
-                  'Z'
-                ].join(' ');
-                
-                const pieColors = [
-                  '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', 
-                  '#ef4444', '#84cc16', '#6366f1', '#f97316', '#14b8a6'
-                ];
-                const color = pieColors[index % pieColors.length];
-                
-                // คำนวณตำแหน่งสำหรับแสดง percentage
-                const midAngle = startAngle + (angle / 2);
-                const labelRadius = 90;
-                const labelX = 96 + labelRadius * Math.cos((midAngle * Math.PI) / 180);
-                const labelY = 96 + labelRadius * Math.sin((midAngle * Math.PI) / 180);
-                const percentageText = `${(percentage * 100).toFixed(1)}%`;
-                
-                return (
-                  <g key={`donut-${index}`}>
-                    <path
-                      d={pathData}
-                      fill={color}
-                      stroke="white"
-                      strokeWidth="2"
+      <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Pie Chart - ขยายขนาดให้ใหญ่ขึ้น */}
+        <div className="relative w-80 h-80 mb-8">
+          <svg width="320" height="320" viewBox="0 0 320 320" className="w-full h-full">
+            {data.map((item, index) => {
+              const percentage = item.value / total;
+              const angle = percentage * 360;
+              
+              const prevPercentage = data.slice(0, index).reduce((sum, d) => sum + d.value, 0) / total;
+              const startAngle = prevPercentage * 360 - 90;
+              const endAngle = startAngle + angle;
+              
+              // Pie chart - เป็นวงกลมเต็ม ไม่ใช่โดนัท
+              const radius = 140;
+              
+              const startX = 160 + radius * Math.cos((startAngle * Math.PI) / 180);
+              const startY = 160 + radius * Math.sin((startAngle * Math.PI) / 180);
+              const endX = 160 + radius * Math.cos((endAngle * Math.PI) / 180);
+              const endY = 160 + radius * Math.sin((endAngle * Math.PI) / 180);
+              
+              const largeArcFlag = angle > 180 ? 1 : 0;
+              
+              const pathData = [
+                'M', 160, 160, // เริ่มที่จุดกึ่งกลาง
+                'L', startX, startY,
+                'A', radius, radius, 0, largeArcFlag, 1, endX, endY,
+                'Z'
+              ].join(' ');
+              
+              const pieColors = [
+                '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', 
+                '#ef4444', '#84cc16', '#6366f1', '#f97316', '#14b8a6'
+              ];
+              const color = pieColors[index % pieColors.length];
+              
+              // คำนวณตำแหน่งสำหรับแสดง percentage
+              const midAngle = startAngle + (angle / 2);
+              const labelRadius = 120;
+              const labelX = 160 + labelRadius * Math.cos((midAngle * Math.PI) / 180);
+              const labelY = 160 + labelRadius * Math.sin((midAngle * Math.PI) / 180);
+              const percentageText = `${(percentage * 100).toFixed(1)}%`;
+              
+              return (
+                <g key={`pie-${index}`}>
+                  <path
+                    d={pathData}
+                    fill={color}
+                    stroke="white"
+                    strokeWidth="3"
+                    className="hover:opacity-80 transition-opacity duration-200"
+                  />
+                  {/* แสดง percentage */}
+                  {percentage > 0.05 && (
+                    <text
+                      x={labelX}
+                      y={labelY}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="white"
+                      fontSize="14"
+                      fontWeight="bold"
+                      stroke="#1e293b"
+                      strokeWidth="1"
+                      paintOrder="stroke"
+                    >
+                      {percentageText}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        
+        {/* Legend */}
+        <div className="w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+            {data.map((item, index) => {
+              const percentage = ((item.value / total) * 100).toFixed(0);
+              const pieColors = [
+                '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', 
+                '#ef4444', '#84cc16', '#6366f1', '#f97316', '#14b8a6'
+              ];
+              const color = pieColors[index % pieColors.length];
+              
+              return (
+                <div key={`legend-${item.label}-${index}`} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                    <div 
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
                     />
-                    {/* แสดง percentage ที่ขอบวงกลม */}
-                    {percentage > 0.05 && (
-                      <text
-                        x={labelX}
-                        y={labelY}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#1e293b"
-                        fontSize="10"
-                        fontWeight="bold"
-                        stroke="white"
-                        strokeWidth="2"
-                        paintOrder="stroke"
-                      >
-                        {percentageText}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-          
-          {/* Legend */}
-          <div className="w-full mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-              {data.map((item, index) => {
-                const percentage = ((item.value / total) * 100).toFixed(0);
-                const pieColors = [
-                  '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', 
-                  '#ef4444', '#84cc16', '#6366f1', '#f97316', '#14b8a6'
-                ];
-                const color = pieColors[index % pieColors.length];
-                
-                return (
-                  <div key={`legend-${item.label}-${index}`} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 min-w-0 flex-1">
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="text-sm text-slate-700">
-                        {truncateAffiliation(item.label)} <span className="font-bold text-slate-900">{item.value}</span> คน
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-slate-900 ml-2">{percentage}%</div>
+                    <span className="text-sm text-slate-700">
+                      {truncateAffiliation(item.label)} <span className="font-bold text-slate-900">{item.value}</span> คน
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="text-sm font-bold text-slate-900 ml-2">{percentage}%</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -452,17 +434,17 @@ const HorizontalBarChart = memo(({ title, data, colors = [], maxHeight = '320px'
 
   if (!sortedData.length || maxValue === 0) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-slate-400" />{title}</h3>
-        <div className="text-center py-8"><p className="text-slate-500">ไม่มีข้อมูลสำหรับแสดงกราฟ</p></div>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center py-8">
+          <p className="text-slate-500">ไม่มีข้อมูลสำหรับแสดงกราฟ</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-      <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-slate-400" />{title}</h3>
-      <div className="space-y-2" style={{ maxHeight, overflowY: 'auto', paddingRight: 8 }}>
+    <div className="h-full">
+      <div className="space-y-2 h-full overflow-y-auto">
         {sortedData.map((item, index) => {
           const barWidth = (item.value / maxValue) * 100;
           const color = colors[index % colors.length] || '#8b5cf6';
@@ -484,6 +466,82 @@ const HorizontalBarChart = memo(({ title, data, colors = [], maxHeight = '320px'
                 >
                    <span className="text-white text-sm font-bold">{item.value}</span>
                 </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+// SummaryCards Component - แทนที่กราฟโดนัท
+const SummaryCards = memo(({ data, colors = [] }) => {
+  const total = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
+  const sortedData = useMemo(() => 
+    [...data].sort((a, b) => b.value - a.value), [data]
+  );
+
+  if (!data.length || total === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center py-8">
+          <p className="text-slate-500">ไม่มีข้อมูลสำหรับแสดงผล</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* สรุปรวม */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-xl">
+          <div className="text-2xl font-bold">{total}</div>
+          <div className="text-sm opacity-90">รวมทั้งหมด</div>
+        </div>
+        
+        {/* ข้อมูลสูงสุด */}
+        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl">
+          <div className="text-2xl font-bold">{sortedData[0]?.value || 0}</div>
+          <div className="text-sm opacity-90">สูงสุด: {sortedData[0]?.label || 'ไม่มีข้อมูล'}</div>
+        </div>
+      </div>
+
+      {/* รายการข้อมูลแบบการ์ด */}
+      <div className="space-y-3">
+        {sortedData.map((item, index) => {
+          const percentage = ((item.value / total) * 100).toFixed(1);
+          const color = colors[index % colors.length] || '#8b5cf6';
+          
+          return (
+            <div 
+              key={`${item.label}-${index}`} 
+              className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-lg p-4 hover:shadow-md transition-all duration-200"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-4 h-4 rounded-full" 
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="font-medium text-slate-800">{item.label}</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-slate-900">{item.value}</div>
+                  <div className="text-xs text-slate-500">{percentage}%</div>
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div 
+                  className="h-2 rounded-full transition-all duration-700" 
+                  style={{ 
+                    width: `${percentage}%`, 
+                    backgroundColor: color 
+                  }}
+                />
               </div>
             </div>
           );
@@ -1219,7 +1277,7 @@ export default function PersonnelPage({ user }) {
             data={getChartData('position')}
             colors={chartColors}
             title="ตำแหน่ง"
-            maxHeight="320px"
+            maxHeight="800px"
           />
         );
       case "affiliation":
@@ -1228,7 +1286,7 @@ export default function PersonnelPage({ user }) {
             data={getChartData('affiliation')}
             colors={chartColors}
             title="สัดส่วนแต่ละสังกัด"
-            maxHeight="320px"
+            maxHeight="800px"
           />
         );
       case "department":
@@ -1285,8 +1343,8 @@ export default function PersonnelPage({ user }) {
   return (
     <div className="w-full min-h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">ข้อมูลบุคลากร</h1>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">ข้อมูลบุคลากร</h1>
           <button
             onClick={() => setShowSearchModal(true)}
             className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow text-sm transition-colors"
@@ -1385,25 +1443,23 @@ export default function PersonnelPage({ user }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
           <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟแท่ง</h2>
-          <div className="h-[520px] overflow-y-auto">
+          <div className="h-[520px]">
             {renderChart()}
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
           <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟวงกลม</h2>
-          <div className="h-[520px] overflow-y-auto">
+          <div className="h-[520px]">
             <PieChartComponent data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
           </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
-          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟโดนัท</h2>
-          <div className="h-[520px] overflow-y-auto">
-            <DonutChart data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
-          </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 h-[600px]">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">สรุปข้อมูล</h2>
+          <SummaryCards data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[600px]">
           <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">กราฟเส้น</h2>
-          <div className="h-[520px] overflow-y-auto">
+          <div className="h-[520px]">
             <LineChart data={getChartData(selectedChart)} colors={chartColors} title={getChartTitle(selectedChart)} />
           </div>
         </div>
