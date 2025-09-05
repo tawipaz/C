@@ -1,7 +1,7 @@
 // src/config.js
 const isDevelopment = window.location.hostname === 'localhost';
 
-// API Base URL - เปลี่ยนเป็น Render API
+// API Base URL - ใช้ Render API
 const API_BASE_URL = "https://cmc-api-2sev.onrender.com";
 
 export const CONFIG = {
@@ -12,12 +12,13 @@ export const CONFIG = {
   API_BASE_URL: API_BASE_URL,
   
   OFFICERS_API: `${API_BASE_URL}/api/officers`,
-  UNITS_API: `${API_BASE_URL}/api/units`,
   SCHEDULES_API: `${API_BASE_URL}/api/schedules`,
+  DUTY_SCHEDULE_API: `${API_BASE_URL}/api/duty-schedule`,
   LOGS_API: `${API_BASE_URL}/api/logs`,
   ADMIN_API: `${API_BASE_URL}/api/admin`,
   AUTH_API: `${API_BASE_URL}/api/auth`,
   UNIT_STRUCTURE_API: `${API_BASE_URL}/api/unit-structure`,
+  GENERAL_STATS_API: `${API_BASE_URL}/api/general-stats`,
   
   // Redirect URI
   REDIRECT_URI: isDevelopment

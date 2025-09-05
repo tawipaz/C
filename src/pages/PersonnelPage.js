@@ -35,18 +35,6 @@ import { CONFIG } from '../config';
 import DonutChart from '../components/DonutChart';
 import LineChart from '../components/LineChart';
 
-// Function to format phone number (add leading 0 if needed)
-const formatPhoneNumber = (phone) => {
-  if (!phone) return '';
-  const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
-  if (cleanPhone.length === 9) {
-    return '0' + cleanPhone; // Add leading 0 for 9-digit numbers
-  }
-  return cleanPhone; // Return as-is for other lengths
-};
-
-
-
 // StatCard Component
 const StatCard = memo(({ title, value, icon: Icon, color = "blue", trend, subtitle }) => (
   <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
@@ -657,7 +645,7 @@ const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
                   <Phone className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm text-slate-700">{formatPhoneNumber(person.phone) || 'ไม่ระบุ'}</span>
+                  <span className="text-sm text-slate-700">{person.phone || 'ไม่ระบุ'}</span>
                 </div>
                 <div className="flex items-center gap-3 p-2 rounded-lg bg-white/70 hover:bg-white transition-colors">
                   <Mail className="w-4 h-4 text-slate-500" />
@@ -718,7 +706,7 @@ const PersonnelDetailModal = memo(({ person, isOpen, onClose }) => {
           <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-slate-200">
             {person.phone && (
               <button 
-                onClick={() => window.open(`tel:${formatPhoneNumber(person.phone)}`, '_self')} 
+                onClick={() => window.open(`tel:${person.phone}`, '_self')} 
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 <Phone className="w-4 h-4" />
@@ -788,7 +776,7 @@ const PersonCard = memo(({ person, onView, onCall, onMail }) => {
         <div className="flex items-center gap-2">
           {person.phone && (
             <button 
-              onClick={() => onCall(formatPhoneNumber(person.phone))} 
+              onClick={() => onCall(person.phone)} 
               className="flex-1 p-2 rounded-xl bg-green-100 hover:bg-green-200 text-green-600 transition-colors shadow-sm flex items-center justify-center gap-1" 
               title="โทร"
             >
@@ -980,10 +968,11 @@ export default function PersonnelPage({ user }) {
   const [showDetail, setShowDetail] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
 
-  const [quota, setQuota] = useState(100);
-  const [vacancy, setVacancy] = useState(20);
+  const [quota, setQuota] = useState(0);
+  const [vacancy, setVacancy] = useState(0);
   const [isEditingQuota, setIsEditingQuota] = useState(false);
   const [isEditingVacancy, setIsEditingVacancy] = useState(false);
+  const [generalStatsData, setGeneralStatsData] = useState({});
 
   const [selectedChart, setSelectedChart] = useState("position"); // Default chart type
   const [selectedAffiliation, setSelectedAffiliation] = useState(""); // For department filtering
@@ -1008,6 +997,74 @@ export default function PersonnelPage({ user }) {
       }),
     }).catch((error) => console.error('Failed to log activity:', error));
   }, [user]);
+
+  // ฟังก์ชันดึงข้อมูลจาก general_stats API
+  const fetchGeneralStats = useCallback(async () => {
+    try {
+      const response = await fetch(CONFIG.GENERAL_STATS_API);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      
+      if (result.success && Array.isArray(result.data)) {
+        const statsMap = {};
+        result.data.forEach(item => {
+          statsMap[item.name] = item.value;
+        });
+        setGeneralStatsData(statsMap);
+        
+        // ตั้งค่า quota และ vacancy จากข้อมูล API
+        setQuota(statsMap.quota || 0);
+        setVacancy(statsMap.vacancy || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching general stats:', error);
+      // ใช้ค่าเริ่มต้นในกรณีที่ดึงข้อมูลไม่ได้
+      setQuota(100);
+      setVacancy(20);
+    }
+  }, []);
+
+  // ฟังก์ชันอัพเดทค่าใน general_stats
+  const updateGeneralStat = useCallback(async (name, value) => {
+    try {
+      const response = await fetch(`${CONFIG.GENERAL_STATS_API}/value/${name}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: parseInt(value) })
+      });
+      
+      if (!response.ok) {
+        // ถ้ายังไม่มีข้อมูล ให้สร้างใหม่
+        if (response.status === 404) {
+          const createResponse = await fetch(CONFIG.GENERAL_STATS_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              name: name, 
+              value: parseInt(value),
+              description: name === 'quota' ? 'กรอบอัตรากำลังทั้งหมด' : 'จำนวนตำแหน่งว่าง'
+            })
+          });
+          
+          if (!createResponse.ok) {
+            throw new Error('Failed to create new stat');
+          }
+        } else {
+          throw new Error('Failed to update stat');
+        }
+      }
+      
+      // อัพเดทข้อมูลใน state
+      setGeneralStatsData(prev => ({
+        ...prev,
+        [name]: parseInt(value)
+      }));
+      
+    } catch (error) {
+      console.error(`Error updating ${name}:`, error);
+      alert(`เกิดข้อผิดพลาดในการบันทึก ${name === 'quota' ? 'กรอบอัตรา' : 'ตำแหน่งว่าง'}`);
+    }
+  }, []);
 
   const fetchPersonnelData = useCallback(async () => {
     try {
@@ -1042,11 +1099,15 @@ export default function PersonnelPage({ user }) {
 
   useEffect(() => {
     fetchPersonnelData();
-  }, [fetchPersonnelData]);
+    fetchGeneralStats(); // เพิ่มการดึงข้อมูล general stats
+  }, [fetchPersonnelData, fetchGeneralStats]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchPersonnelData().finally(() => setRefreshing(false));
+    Promise.all([
+      fetchPersonnelData(),
+      fetchGeneralStats()
+    ]).finally(() => setRefreshing(false));
   };
 
   const handleViewPerson = (person) => {
@@ -1175,15 +1236,6 @@ export default function PersonnelPage({ user }) {
     });
     return newStats;
   }, [personnelData]);
-
-  useEffect(() => {
-    console.log("Personnel Data:", personnelData);
-  }, [personnelData]);
-
-  useEffect(() => {
-    console.log("Stats:", stats);
-    console.log("Chart Data:", chartData);
-  }, [stats, chartData]);
 
   const chartColors = [
     "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#FFCD56", "#C9CBCF"
@@ -1362,7 +1414,14 @@ export default function PersonnelPage({ user }) {
           icon={Briefcase}
           color="blue"
           isEditing={isEditingQuota}
-          onEdit={() => setIsEditingQuota(!isEditingQuota)}
+          onEdit={async () => {
+            if (isEditingQuota) {
+              // บันทึกข้อมูลเมื่อเสร็จสิ้นการแก้ไข
+              await updateGeneralStat('quota', quota);
+              logAdminActivity('update_quota', `Updated quota to ${quota}`);
+            }
+            setIsEditingQuota(!isEditingQuota);
+          }}
           onChange={(value) => setQuota(value)}
           isAdmin={user?.role === 'admin'}
         />
@@ -1372,7 +1431,14 @@ export default function PersonnelPage({ user }) {
           icon={UserX}
           color="red"
           isEditing={isEditingVacancy}
-          onEdit={() => setIsEditingVacancy(!isEditingVacancy)}
+          onEdit={async () => {
+            if (isEditingVacancy) {
+              // บันทึกข้อมูลเมื่อเสร็จสิ้นการแก้ไข
+              await updateGeneralStat('vacancy', vacancy);
+              logAdminActivity('update_vacancy', `Updated vacancy to ${vacancy}`);
+            }
+            setIsEditingVacancy(!isEditingVacancy);
+          }}
           onChange={(value) => setVacancy(value)}
           isAdmin={user?.role === 'admin'}
         />

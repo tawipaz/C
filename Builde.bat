@@ -5,7 +5,7 @@ echo ========================================
 echo.
 
 echo [INFO] Changing directory to project folder...
-cd /d "C:\Users\LENOVO\Desktop\test"
+cd /d "C:\Users\LENOVO\Documents\GitHub\court-marshal-connect"
 
 echo [INFO] Current directory: %cd%
 echo.
